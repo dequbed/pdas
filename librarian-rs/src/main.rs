@@ -10,6 +10,9 @@ extern crate tree_magic;
 extern crate csv;
 extern crate serde;
 
+extern crate lmdb;
+extern crate directories;
+
 mod read;
 mod db;
 mod git;
