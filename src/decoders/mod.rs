@@ -14,7 +14,29 @@ use crate::error::Error;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 
+use crate::Librarian;
+use clap::{App, ArgMatches};
+
 use log::Level::*;
+
+pub const SUBCOMMAND: &str = "read";
+
+pub fn clap() -> App<'static, 'static> {
+    clap_app!(@subcommand read => 
+        (about: "try to decode a file")
+        (@arg file: *)
+    )
+}
+
+pub fn run(lib: Librarian, matches: &ArgMatches) {
+    if let Some(file) = matches.value_of("file") {
+        let fpath = PathBuf::from(file);
+        let vfp = vec![fpath];
+        let result = Decoder::decode(&vfp);
+
+        println!("{:?}", result.get(0));
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Storables {

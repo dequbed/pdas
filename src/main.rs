@@ -42,6 +42,7 @@ fn main() {
         (subcommand: archive::clap())
         (subcommand: db::clap())
         (subcommand: git::clap())
+        (subcommand: decoders::clap())
     ).get_matches();
 
     stderrlog::new()
@@ -55,6 +56,7 @@ fn main() {
 
     match matches.subcommand() {
         (archive::SUBCOMMAND, Some(args)) => archive::run(librarian, args),
+        (decoders::SUBCOMMAND, Some(args)) => decoders::run(librarian, args),
         ("db", Some(args)) => db::run(librarian, args),
         ("git", Some(args)) => git::run(args),
         _ => {}
