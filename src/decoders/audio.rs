@@ -5,7 +5,8 @@ use std::ffi::OsStr;
 
 use serde::{Serialize, Deserialize};
 
-use metaflac::Tag;
+use metaflac::Tag as FlacTag;
+use id3::Tag as Id3Tag;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Song {
@@ -27,12 +28,11 @@ impl FlacDecoder {
 
         for p in paths {
             let mut f = File::open(p).unwrap();
-            let tag = Tag::read_from(&mut f);
+            let tag = FlacTag::read_from(&mut f);
 
             match tag {
                 Ok(t) => {
                     if let Some(vc) = t.vorbis_comments() {
-                        println!("{:?}", vc);
                         rv.push(Song {
                             artist: vc.artist().map(|v| v.clone()).unwrap_or_else(Vec::new),
                             title: vc.title().map(|v| v.get(0).map(|s| s.clone()))
@@ -47,6 +47,36 @@ impl FlacDecoder {
                     }
                 }
                 Err(e) => error!("Failed to read FLAC tag: {}", e),
+            }
+        }
+
+        rv
+    }
+}
+
+pub struct Id3Decoder;
+
+impl Id3Decoder {
+    pub fn decode(paths: &[&Path]) -> Vec<Song> {
+        let mut rv = Vec::with_capacity(paths.len());
+
+        for p in paths {
+            match Id3Tag::read_from_path(p) {
+                Ok(tag) => {
+                    rv.push(Song {
+                        artist: tag.artist().map(str::to_string).map(|s| vec![s]).unwrap_or_else(Vec::new),
+                        title: tag.title().map(str::to_string)
+                                .unwrap_or_else(|| p.file_name().and_then(OsStr::to_str).map(str::to_string).unwrap()),
+                        album: tag.album().map(str::to_string),
+                        genre: tag.genre().map(str::to_string),
+                        track: tag.track(),
+                        totaltracks: tag.total_tracks(),
+                        albumartist: tag.album_artist().map(str::to_string),
+                        // FIXME: ID3 can very much contain lyrics. Different language ones even.
+                        lyrics: None,
+                    });
+                }
+                Err(e) => error!("Unable to read ID3 tag for {}", p.display()),
             }
         }
 

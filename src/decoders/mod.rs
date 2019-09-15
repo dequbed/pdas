@@ -49,6 +49,7 @@ enum FT {
     PDF,
     EPUB,
     FLAC,
+    MPEG,
     Unrecognized,
 }
 
@@ -68,6 +69,7 @@ impl Decoder {
                     "application/pdf" => FT::PDF,
                     "application/epub+zip" => FT::EPUB,
                     "audio/flac" => FT::FLAC,
+                    "audio/mpeg" => FT::MPEG,
                     _ => FT::Unrecognized
                 };
 
@@ -122,7 +124,15 @@ impl Decoder {
                         .map(Ok)
                         .collect();
                     out.append(&mut r);
-                }
+                },
+                FT::MPEG => {
+                    let mut r = Id3Decoder::decode(v)
+                        .into_iter()
+                        .map(Storables::Audio)
+                        .map(Ok)
+                        .collect();
+                    out.append(&mut r);
+                },
                 _ => {}
             }
         }
