@@ -30,3 +30,5 @@ chrono = { version = "0.4", features = ["serde"] }
 
 metaflac = "0.1"
 id3 = "0.3"
+
+toml = "0.5"
