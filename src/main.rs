@@ -46,7 +46,7 @@ fn main() {
         (@setting SubcommandRequiredElseHelp)
         (version: crate_version!())
         (author: crate_authors!())
-        (about: "librarian is a tool to analyze and archive various types files more easily into a git-annex repository")
+        (about: "pdas is a tool to analyze and archive various types files more easily into a git-annex repository")
         (@arg CONFIG: -c --config +takes_value +global "Use the specified config file")
         (@arg verbose: -v --verbose +global ... "Be more verbose")
         (@arg quiet: -q --quiet +global "Be quiet")
@@ -83,11 +83,11 @@ pub struct Librarian {
 
 impl Librarian {
     pub fn new(args: &clap::ArgMatches) -> Self {
-        let proj_dir = ProjectDirs::from("org", "paranoidlabs", "librarian").unwrap();
+        let proj_dir = ProjectDirs::from("org", "paranoidlabs", "pdas").unwrap();
         let configp = args.value_of("CONFIG")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
-                proj_dir.config_dir().with_file_name("librarian.toml")
+                proj_dir.config_dir().with_file_name("pdas.toml")
             });
 
         let mut config = config::Config::default();
