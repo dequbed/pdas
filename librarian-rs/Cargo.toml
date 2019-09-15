@@ -25,3 +25,7 @@ directories = "2.0"
 libc = "*"
 
 bincode = "1.1"
+
+chrono = { version = "0.4", features = ["serde"] }
+
+metaflac = "0.1"

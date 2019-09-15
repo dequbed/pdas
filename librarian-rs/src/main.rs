@@ -17,6 +17,8 @@ extern crate libc;
 
 extern crate bincode;
 
+extern crate chrono;
+
 use std::path::Path;
 
 mod archive;

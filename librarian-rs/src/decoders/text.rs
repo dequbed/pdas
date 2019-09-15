@@ -6,6 +6,8 @@ use serde::{Serialize, Deserialize};
 
 use epub::doc::EpubDoc;
 
+use chrono::prelude::*;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Book {
     pub filename: String,
@@ -13,7 +15,7 @@ pub struct Book {
     pub title: Option<String>,
     pub subject: Option<String>,
     pub description: Option<String>,
-    pub date: Option<String>,
+    pub date: Option<DateTime>,
     pub identifier: Option<String>,
     pub language: Option<String>,
     pub publisher: Option<String>,
@@ -98,3 +100,11 @@ impl EpubDecoder {
         None
     }
 }
+
+// keys for creation time in my collection of epubs:
+//
+// - "Date" format "YYYY-MM-DD"
+// - "Date" format "YYYY"
+// - "Date" format "YYYY-MM-DDTHH:MM:SS+HH:MM"
+// - "Date" format "2010-11-20T15:37:21.077000+00:00"
+// - "Date" format "YYYY-MM"

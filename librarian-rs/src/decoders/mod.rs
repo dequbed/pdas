@@ -1,6 +1,8 @@
 pub mod text;
+pub mod audio;
 
 pub use text::*;
+pub use audio::*;
 
 use serde::{Serialize, Deserialize};
 
@@ -43,23 +45,26 @@ impl Decoder {
         let mut map: HashMap<FT, Vec<&Path>> = HashMap::new();
 
         for f in files {
-            let mime = tree_magic::from_filepath(f);
+            if let Some(mime) = tree_magic::from_filepath(f) {
 
-            debug!("Inferred mime type of file {} as {}", f.display(), mime);
+                debug!("Inferred mime type of file {} as {}", f.display(), mime);
 
-            let ft = match mime.as_str() {
-                "application/pdf" => FT::PDF,
-                "application/epub+zip" => FT::EPUB,
-                _ => FT::Unrecognized
-            };
+                let ft = match mime.as_str() {
+                    "application/pdf" => FT::PDF,
+                    "application/epub+zip" => FT::EPUB,
+                    _ => FT::Unrecognized
+                };
 
-            if log_enabled!(Info) && ft == FT::Unrecognized {
-                info!("no decoder available for file {} with inferred mime type {}", f.display(), mime);
-            }
+                if log_enabled!(Info) && ft == FT::Unrecognized {
+                    info!("no decoder available for file {} with inferred mime type {}", f.display(), mime);
+                }
 
-            match map.entry(ft) {
-                Entry::Occupied(mut e) => e.get_mut().push(f),
-                Entry::Vacant(e) => { e.insert(vec![f]); },
+                match map.entry(ft) {
+                    Entry::Occupied(mut e) => e.get_mut().push(f),
+                    Entry::Vacant(e) => { e.insert(vec![f]); },
+                }
+            } else {
+                warn!("No MIME for {}", f.display());
             }
         }
 
