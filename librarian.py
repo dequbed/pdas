@@ -16,6 +16,8 @@ from cloudant import couchdb as CouchDB
 from cloudant.database import CouchDatabase as Database
 from cloudant.document import Document
 
+from mime.registry import Registry
+
 from yaml import load, dump
 
 cfgpath = os.path.expanduser("~/.config/librarian.cfg")
@@ -26,7 +28,7 @@ parser.set_defaults(config=cfgpath)
 
 subparsers = parser.add_subparsers()
 
-
+registry = Registry()
 
 def archive(args):
     """archive a list of files"""
@@ -85,6 +87,36 @@ def sync(args):
 syncp = subparsers.add_parser('sync', help=sync.__doc__)
 syncp.add_argument('--content', help='a file to be archived.', action='store_true')
 syncp.set_defaults(func=sync)
+
+
+def read(args):
+    """read metadata from a list of files"""
+    for f in args.files:
+        ext = pathlib.PurePosixPath(f).suffix
+
+        mimetype = mime_from_ext(ext)
+        if not mimetype:
+            fp = open(f, 'rb')
+            mimetype = magic.from_buffer(fp.read(1024), mime=True)
+
+        mimemod = mimetype.replace("/", ".")
+
+        try:
+            pkg = importlib.import_module("mime." + mimemod)
+
+            doc = {}
+
+            pkg.archive(doc, f)
+
+            print(doc)
+
+        except Exception as e:
+            print("Exception %s for handler %s when archiving %s" % (e, mimemod, f))
+
+
+readp = subparsers.add_parser('read', help=read.__doc__)
+readp.add_argument('files', metavar='filename', nargs='+', help='a file to be archived.')
+readp.set_defaults(func=read)
 
 args = parser.parse_args()
 
