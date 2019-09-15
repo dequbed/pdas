@@ -15,7 +15,7 @@ pub struct Book {
     pub title: Option<String>,
     pub subject: Option<String>,
     pub description: Option<String>,
-    pub date: Option<DateTime>,
+    pub date: Option<String>,
     pub identifier: Option<String>,
     pub language: Option<String>,
     pub publisher: Option<String>,
@@ -27,7 +27,7 @@ pub struct PdfDecoder;
 
 impl PdfDecoder {
     pub fn decode(paths: &[&Path]) -> Vec<Book> {
-        let mut rv = Vec::new();
+        let mut rv = Vec::with_capacity(paths.len());
         match Command::new("exiftool")
                         .arg("-j")
                         .args(paths.iter())

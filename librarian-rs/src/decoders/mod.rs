@@ -18,22 +18,15 @@ use log::Level::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Storables {
-    Text(Book)
-}
-
-impl Storables {
-    pub fn filename<'a>(&'a self) -> &'a str {
-        use Storables::*;
-        match self {
-            Text(b) => &b.filename,
-        }
-    }
+    Text(Book),
+    Audio(Song),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 enum FT {
     PDF,
     EPUB,
+    FLAC,
     Unrecognized,
 }
 
@@ -52,6 +45,7 @@ impl Decoder {
                 let ft = match mime.as_str() {
                     "application/pdf" => FT::PDF,
                     "application/epub+zip" => FT::EPUB,
+                    "audio/flac" => FT::FLAC,
                     _ => FT::Unrecognized
                 };
 
@@ -95,6 +89,14 @@ impl Decoder {
                     let mut r = EpubDecoder::decode(v)
                         .into_iter()
                         .map(Storables::Text)
+                        .map(Ok)
+                        .collect();
+                    out.append(&mut r);
+                },
+                FT::FLAC => {
+                    let mut r = FlacDecoder::decode(v)
+                        .into_iter()
+                        .map(Storables::Audio)
                         .map(Ok)
                         .collect();
                     out.append(&mut r);

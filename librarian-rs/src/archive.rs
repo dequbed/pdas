@@ -53,6 +53,10 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
 
     let mut keymap = HashMap::<&str, &str>::new();
     if !meta.is_empty() {
+        let metaf = pb
+            .iter()
+            .map(|b| b.file_name().and_then(|os| os.to_str()))
+            .zip(meta);
         info!("Storing Metadata");
 
         let db = lib.dbm.open().unwrap();
@@ -61,19 +65,20 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
         for (key, file) in keys.iter() {
             keymap.insert(&file, &key);
         }
-        for f in meta.iter() {
-            match f {
-                Ok(s) => {
-                    if let Some(k) = keymap.get(s.filename()) {
-                        db.put_store(&mut w, k.as_bytes(), s).unwrap();
-                        keymap.remove(s.filename());
+        for i in metaf {
+            match i {
+                (Some(p), Ok(f)) => {
+                    if let Some(k) = keymap.get(&p) {
+                        db.put_store(&mut w, k.as_bytes(), &f).unwrap();
+                        keymap.remove(&p);
                     } else {
-                        warn!("file {} does not appear to have been annexed or was annexed twice", s.filename());
+                        warn!("file {} does not appear to have been annexed or was annexed twice", p);
                     }
                 }
-                Err(e) => {
+                (_, Err(e)) => {
                     error!("Failure to decode: {:?}", e);
                 }
+                _ => error!("Failure to decode path"),
             }
         }
 
