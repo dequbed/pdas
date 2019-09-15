@@ -255,59 +255,6 @@ impl<'env> Writer<'env> {
     }
 }
 
-#[derive(Copy, Clone)]
-pub struct Database {
-    db: lmdb::Database,
-}
-
-impl Database {
-    pub fn new(db: lmdb::Database) -> Self {
-        Self { db }
-    }
-
-    pub fn get<R: ReadTransaction, K: AsRef<[u8]>, D, T>(self, reader: &R, k: K, decoder: D) -> Result<T, Error> 
-        where D: Fn(&[u8]) -> Result<T, Error>
-    {
-        reader.get(self.db, &k, decoder)
-    }
-
-    pub fn get_store<R: ReadTransaction, K: AsRef<[u8]>>(self, reader: &R, k: K) -> Result<Storables, Error> {
-        self.get(reader, k, |b| bincode::deserialize(b).map_err(Error::Bincode))
-    }
-
-    pub fn put<K: AsRef<[u8]>, T: AsRef<[u8]>>(self, writer: &mut Writer, k: K, v: T) -> Result<(), Error> {
-        writer.put(self.db, &k, &v, WriteFlags::empty())
-    }
-
-    pub fn put_store<K: AsRef<[u8]>>(self, writer: &mut Writer, k: K, v: &Storables) -> Result<(), Error> {
-        // TODO: Allocate memory in LMDB, write directly into it.
-        let vec = bincode::serialize(v)?;
-
-        self.put(writer, k, &vec)
-    }
-
-    pub fn delete<K: AsRef<[u8]>>(self, writer: &mut Writer, k: K, v: Vec<u8>) -> Result<(), Error> {
-        writer.delete(self.db, &k, Some(&v))
-    }
-
-    pub fn iter_start<R: ReadTransaction>(self, reader: &R) -> Result<Iter, Error> {
-        let mut cursor = reader.open_ro_cursor(self.db)?;
-        let iter = cursor.iter();
-        Ok(Iter {
-            iter, 
-            cursor,
-        })
-    }
-
-    pub fn iter_from<R: ReadTransaction, K: AsRef<[u8]>>(self, reader: &R, k: K) -> Result<Iter, Error> {
-        let mut cursor = reader.open_ro_cursor(self.db)?;
-        let iter = cursor.iter_from(k);
-        Ok(Iter {
-            iter, 
-            cursor,
-        })
-    }
-}
 
 #[derive(Copy, Clone)]
 pub struct ItemDatabase {
