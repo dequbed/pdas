@@ -1,5 +1,4 @@
 use std::path::Path;
-use std::slice;
 
 use clap::{App, ArgMatches};
 
@@ -13,6 +12,10 @@ use lmdb::Transaction;
 use lmdb::{RoCursor, RwCursor};
 use lmdb::{RoTransaction, RwTransaction};
 
+use rust_stemmers::{Algorithm, Stemmer};
+
+use std::rc::Rc;
+
 use crate::Librarian;
 use crate::error::Error;
 
@@ -24,16 +27,19 @@ pub fn clap() -> App<'static, 'static> {
         (about: "DB management subsystem")
         (@subcommand read =>
             (about: "read from the specified db")
-            (@arg key: * "key to extract")
-        )
+            (@arg key: * "key to extract"))
         (@subcommand dump =>
-            (about: "dump contents of the db")
-        )
+            (about: "dump contents of the db"))
+        (@subcommand index =>
+            (about: "dump the index of the db"))
+        (@subcommand search =>
+            (about: "search for a word")
+            (@arg term: * "search term"))
     )
 }
 
 pub fn run(lib: Librarian, matches: &ArgMatches) {
-    let db = lib.dbm.open().unwrap();
+    let db = lib.dbm.create().unwrap();
 
     match matches.subcommand() {
         ("read", Some(args)) => {
@@ -62,7 +68,45 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
                 println!("{:?}", i);
             }
         }
+        ("index", _) => {
+            let idb = lib.dbm.create_index().unwrap();
+            let r = lib.dbm.read().unwrap();
+            let is = idb.iter_start(&r).unwrap();
+            for i in is {
+                println!("{:?}", i);
+            }
+        }
+        ("search", Some(a)) => {
+            let needle = a.value_of("term").unwrap();
+            let db = lib.dbm.create().unwrap();
+            let idb = lib.dbm.create_index().unwrap();
+            let r = lib.dbm.read().unwrap();
+
+            let res = find(db, idb, r, needle);
+        }
         _ => {}
+    }
+}
+
+fn find(db: ItemDatabase, dbi: TermDatabase, r: Reader, needle: &str) {
+    let en_stem = Stemmer::create(Algorithm::English);
+    let ndl = en_stem.stem(needle);
+    let term = Term::String(ndl.into());
+
+    match dbi.get(&r, &term) {
+        Ok(vec) => {
+            for v in vec {
+                if let Ok(r) = db.get(&r, v.key) {
+                    println!("{:?}", r);
+                }
+            }
+        }
+        Err(Error::LMDB(lmdb::Error::NotFound)) => {
+            println!("No results");
+        }
+        Err(e) => {
+            error!("while querying index db: {:?}", e);
+        }
     }
 }
 
@@ -180,11 +224,25 @@ impl Manager {
     }
 
     pub fn open(&self) -> Result<ItemDatabase, Error> {
-        self.env.open_db(None).map_err(Error::LMDB).map(ItemDatabase::new)
+        self.env.open_db(Some("main")).map_err(Error::LMDB).map(ItemDatabase::new)
+    }
+
+    pub fn open_index(&self) -> Result<TermDatabase, Error> {
+        self.env.open_db(Some("index")).map_err(Error::LMDB).map(TermDatabase::new)
+    }
+    pub fn open_named(&self, name: &str) -> Result<lmdb::Database, Error> {
+        self.env.open_db(Some(name)).map_err(Error::LMDB)
     }
 
     pub fn create(&self) -> Result<ItemDatabase, Error> {
-        self.env.create_db(None, DatabaseFlags::empty()).map_err(Error::LMDB).map(ItemDatabase::new)
+        self.env.create_db(Some("main"), DatabaseFlags::empty()).map_err(Error::LMDB).map(ItemDatabase::new)
+    }
+
+    pub fn create_index(&self) -> Result<TermDatabase, Error> {
+        self.env.create_db(Some("index"), DatabaseFlags::empty()).map_err(Error::LMDB).map(TermDatabase::new)
+    }
+    pub fn create_named(&self, name: &str) -> Result<lmdb::Database, Error> {
+        self.env.create_db(Some(name), DatabaseFlags::empty()).map_err(Error::LMDB)
     }
 
     pub fn read(&self) -> Result<Reader, Error> {
@@ -280,31 +338,31 @@ impl ItemDatabase {
         writer.delete(self.db, k.into_inner(), Some(&v))
     }
 
-    pub fn iter_start<R: ReadTransaction>(self, reader: &R) -> Result<Iter, Error> {
+    pub fn iter_start<R: ReadTransaction>(self, reader: &R) -> Result<ItemIter, Error> {
         let mut cursor = reader.open_ro_cursor(self.db)?;
         let iter = cursor.iter();
-        Ok(Iter {
+        Ok(ItemIter {
             iter, 
             cursor,
         })
     }
 
-    pub fn iter_from<R: ReadTransaction, B: Backend>(self, reader: &R, k: B) -> Result<Iter, Error> {
+    pub fn iter_from<R: ReadTransaction, B: Backend>(self, reader: &R, k: B) -> Result<ItemIter, Error> {
         let mut cursor = reader.open_ro_cursor(self.db)?;
         let iter = cursor.iter_from(k.into_inner());
-        Ok(Iter {
+        Ok(ItemIter {
             iter, 
             cursor,
         })
     }
 }
 
-pub struct Iter<'env> {
+pub struct ItemIter<'env> {
     iter: lmdb::Iter<'env>,
     cursor: RoCursor<'env>,
 }
 
-impl<'env> Iterator for Iter<'env> {
+impl<'env> Iterator for ItemIter<'env> {
     type Item = Result<(SHA256E, Storables), Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -324,12 +382,12 @@ impl<'env> Iterator for Iter<'env> {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TermOccurance {
     /// A term occurs in this key
-    key: SHA256E,
+    pub key: SHA256E,
     /// The term occurs at the n-th positions.
-    occ: Vec<u32>,
+    pub occ: Vec<u32>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Term {
     String(String)
 }
@@ -339,11 +397,6 @@ impl AsRef<[u8]> for Term {
             Term::String(s) => s.as_bytes(),
         }
     }
-}
-
-pub struct IterDup<'env> {
-    iter: lmdb::IterDup<'env>,
-    cursor: RoCursor<'env>,
 }
 
 #[derive(Copy, Clone)]
@@ -356,26 +409,57 @@ impl TermDatabase {
         Self { db }
     }
 
-    pub fn get<R: ReadTransaction>(self, reader: &R, k: Term) -> Result<TermOccurance, Error> {
-        reader.get(self.db, &k, |b| bincode::deserialize(b).map_err(Error::Bincode))
+    pub fn get<R: ReadTransaction>(self, reader: &R, k: &Term) -> Result<Vec<TermOccurance>, Error> {
+        reader.get(self.db, k, |b| bincode::deserialize(b).map_err(Error::Bincode))
     }
 
-    pub fn put(self, writer: &mut Writer, k: Term, v: TermOccurance) -> Result<(), Error> {
+    pub fn put(self, writer: &mut Writer, k: &Term, v: Vec<TermOccurance>) -> Result<(), Error> {
         let vec = bincode::serialize(&v)?;
-        writer.put(self.db, &k, &vec, WriteFlags::empty())
+        writer.put(self.db, k, &vec, WriteFlags::empty())
     }
 
-    pub fn delete(self, writer: &mut Writer, k: Term, v: TermOccurance) -> Result<(), Error> {
-        let vec = bincode::serialize(&v)?;
-        writer.delete(self.db, &k, Some(&vec))
+    pub fn delete(self, writer: &mut Writer, k: &Term) -> Result<(), Error> {
+        writer.delete(self.db, k, None)
     }
 
-    pub fn iter_dup_from<R: ReadTransaction>(self, reader: &R, k: Term) -> Result<IterDup, Error> {
+    pub fn iter_start<R: ReadTransaction>(self, reader: &R) -> Result<IndexIter, Error> {
         let mut cursor = reader.open_ro_cursor(self.db)?;
-        let iter = cursor.iter_dup_from(&k);
-        Ok(IterDup {
+        let iter = cursor.iter_start();
+        Ok(IndexIter {
             iter,
-            cursor,
+            cursor
         })
+    }
+
+    pub fn iter_from<R: ReadTransaction>(self, reader: &R, k: Term) -> Result<IndexIter, Error> {
+        let mut cursor = reader.open_ro_cursor(self.db)?;
+        let iter = cursor.iter_from(&k);
+        Ok(IndexIter {
+            iter,
+            cursor
+        })
+    }
+}
+
+pub struct IndexIter<'env> {
+    iter: lmdb::Iter<'env>,
+    cursor: RoCursor<'env>,
+}
+
+impl<'env> Iterator for IndexIter<'env> {
+    type Item = Result<(Term, Vec<TermOccurance>), Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.iter.next() {
+            None => None,
+            Some(Ok((k,v))) => {
+                let s: String = String::from_utf8_lossy(k).into();
+                match bincode::deserialize(v) {
+                    Err(e) => Some(Err(e.into())),
+                    Ok(v) => Some(Ok((Term::String(s),v))),
+                }
+            },
+            Some(Err(e)) => Some(Err(e.into())),
+        }
     }
 }

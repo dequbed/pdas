@@ -5,6 +5,9 @@ extern crate clap;
 extern crate log;
 extern crate stderrlog;
 
+#[macro_use]
+extern crate lazy_static;
+
 extern crate tree_magic;
 
 extern crate csv;
@@ -20,6 +23,8 @@ extern crate bincode;
 extern crate chrono;
 
 extern crate toml;
+
+extern crate rust_stemmers;
 
 use std::path::PathBuf;
 use directories::ProjectDirs;
@@ -104,6 +109,8 @@ impl Librarian {
 
         let mut dbmb = db::Manager::builder();
         dbmb.set_flags(db::EnvironmentFlags::MAP_ASYNC | db::EnvironmentFlags::WRITE_MAP);
+        dbmb.set_map_size(10485760);
+        dbmb.set_max_dbs(4);
         let dbm = db::Manager::from_builder(&config.database.basedir, dbmb).unwrap();
 
         Librarian {

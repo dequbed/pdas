@@ -44,6 +44,18 @@ pub enum Storables {
     Audio(Song),
 }
 
+impl Storables {
+    pub fn title(&self) -> String {
+        match self {
+            Storables::Text(b) => match b.title { 
+                Some(ref b) => b.clone(),
+                None => b.filename.clone(),
+            },
+            Storables::Audio(s) => s.title.clone(),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 enum FT {
     PDF,
