@@ -4,8 +4,6 @@ pub mod audio;
 pub use text::*;
 pub use audio::*;
 
-use serde::{Serialize, Deserialize};
-
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -18,6 +16,8 @@ use crate::Librarian;
 use clap::{App, ArgMatches};
 
 use log::Level::*;
+
+pub use crate::storage::Storables;
 
 pub const SUBCOMMAND: &str = "read";
 
@@ -35,24 +35,6 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
         let result = Decoder::decode(&vfp);
 
         println!("{:?}", result.get(0));
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Storables {
-    Text(Book),
-    Audio(Song),
-}
-
-impl Storables {
-    pub fn title(&self) -> String {
-        match self {
-            Storables::Text(b) => match b.title { 
-                Some(ref b) => b.clone(),
-                None => b.filename.clone(),
-            },
-            Storables::Audio(s) => s.title.clone(),
-        }
     }
 }
 

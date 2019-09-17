@@ -3,22 +3,10 @@ use std::fs::File;
 
 use std::ffi::OsStr;
 
-use serde::{Serialize, Deserialize};
-
 use metaflac::Tag as FlacTag;
 use id3::Tag as Id3Tag;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Song {
-    pub artist: Vec<String>,
-    pub title: String,
-    pub album: Option<String>,
-    pub genre: Option<String>,
-    pub track: Option<u32>,
-    pub totaltracks: Option<u32>,
-    pub albumartist: Option<String>,
-    pub lyrics: Option<String>,
-}
+use crate::storage::Song;
 
 pub struct FlacDecoder;
 

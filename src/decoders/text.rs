@@ -2,26 +2,9 @@ use std::process::Command;
 
 use std::path::Path;
 
-use serde::{Serialize, Deserialize};
-
 use epub::doc::EpubDoc;
 
-use chrono::prelude::*;
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Book {
-    pub filename: String,
-    pub author: Option<String>,
-    pub title: Option<String>,
-    pub subject: Option<String>,
-    pub description: Option<String>,
-    pub date: Option<String>,
-    pub identifier: Option<String>,
-    pub language: Option<String>,
-    pub publisher: Option<String>,
-    pub license: Option<String>,
-}
-
+use crate::storage::Book;
 
 pub struct PdfDecoder;
 
