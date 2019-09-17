@@ -41,6 +41,8 @@ mod error;
 
 mod config;
 
+mod init;
+
 fn main() {
     let matches = clap_app!(lib =>
         (@setting SubcommandRequiredElseHelp)
@@ -54,6 +56,7 @@ fn main() {
         (subcommand: db::clap())
         (subcommand: git::clap())
         (subcommand: decoders::clap())
+        (subcommand: setup::clap())
     ).get_matches();
 
 
@@ -71,6 +74,7 @@ fn main() {
         (decoders::SUBCOMMAND, Some(args)) => decoders::run(librarian, args),
         ("db", Some(args)) => db::run(librarian, args),
         (git::SUBCOMMAND, Some(args)) => git::run(librarian, args),
+        (setup::SUBCOMMAND, Some(args)) => init::run(librarian, args),
         _ => {}
     }
 }
