@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Serialize, Deserialize};
 
 
@@ -46,3 +48,41 @@ impl Storables {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum Metakey {
+    Subject,
+    Description,
+    Date,
+    Identifier,
+    Language,
+    Publisher,
+    License,
+    Title,
+    Album,
+    Genre,
+    Track,
+    Totaltracks,
+    Albumartist,
+    Lyrics,
+}
+
+//            v defined by Metavalue<typeof Value>
+// Value -> (Tag, &[u8])
+// (Tag, &[u8]) -> Value
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Metadata {
+    /// A human-readable identifier for this object. The tile will be tokenized and indexed, so
+    /// it may contain several words.
+    /// It should not contain redundant information, e.g. name the author when the 'author' field
+    /// is already set.
+    title: String,
+
+    /// The lifeform, lifeforms or intelligent computer program(s) that created this object.
+    author: Vec<String>,
+
+    /// The Filename is relatively often used so we save it as well
+    filename: String,
+
+    metamap: HashMap<Metakey, String>,
+}
