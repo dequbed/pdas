@@ -70,6 +70,33 @@ pub enum Metakey {
 // Value -> (Tag, &[u8])
 // (Tag, &[u8]) -> Value
 
+trait Meta<'de> {
+    // This way different Metadata can have different Rust representations
+    type Value: Serialize + Deserialize<'de>;
+    // To implement this properly we need to use `Bytes`-based abstractions; a Metatag is pretty
+    // much only a specific block of bytes in the larger block of bytes the DB stores for us at
+    // that key. When we have that represented we can encode the Metadata by storing the required
+    // Metadata up front, then an array of what metavalues are stored (i.e. store `[(Tag, Length)]`
+    // specifically so we can read that table without having to decode any of the actual values
+    // (very useful in the cases where we want to access only a select few of the values, e.g. when
+    // reindexing or printing an object with a view filter) and then finally store a CRC checksum
+    // or something similar to allow for error checking.
+    //
+    // When you want to implement a new Metatag you add
+    // ```rust
+    // struct Metatag;
+    // impl Metavalue for Metatag {
+    //     type Value = u64;
+    // }
+    // ```
+    // Only issue to be solved is how to tag which value has which key. One option would be to
+    // simply have a `const ID: u32` that are manually assigned, the other one would be to have an
+    // enum with some ordering and use that.
+    // One goal is that if new metadata types are added later on the application can still read
+    // tags from previous versions. In the case of the tag that means that a value should keep it's
+    // tag once it has been assigned
+} 
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Metadata {
     /// A human-readable identifier for this object. The tile will be tokenized and indexed, so
