@@ -138,6 +138,12 @@ impl<'de> Meta<'de> for Date {
     const KEY: Metakey = Metakey::Date;
 }
 
+pub struct Identifier;
+impl<'de> Meta<'de> for Identifier {
+    type Value = &'de str;
+    const KEY: Metakey = Metakey::Identifier;
+}
+
 // NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,
 // but reading must not need to copy or do expensive decoding operations
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
