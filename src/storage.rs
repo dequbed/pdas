@@ -57,7 +57,6 @@ pub enum Metakey {
     Language,
     Publisher,
     License,
-    Title,
     Album,
     Genre,
     Track,
@@ -73,6 +72,7 @@ pub enum Metakey {
 trait Meta<'de> {
     // This way different Metadata can have different Rust representations
     type Value: Serialize + Deserialize<'de>;
+    const KEY: Metakey;
     // To implement this properly we need to use `Bytes`-based abstractions; a Metatag is pretty
     // much only a specific block of bytes in the larger block of bytes the DB stores for us at
     // that key. When we have that represented we can encode the Metadata by storing the required
@@ -95,13 +95,28 @@ trait Meta<'de> {
     // One goal is that if new metadata types are added later on the application can still read
     // tags from previous versions. In the case of the tag that means that a value should keep it's
     // tag once it has been assigned
+
+    fn decode(bytes: &'de [u8]) -> Self::Value;
 }
 
 use std::marker::PhantomData;
 pub struct Subject;
 impl<'de> Meta<'de> for Subject {
     type Value = &'de str;
+
+    const KEY: Metakey = Metakey::Subject;
+
+    fn decode(bytes: &'de [u8]) -> Self::Value {
+        unsafe { std::str::from_utf8_unchecked(bytes) }
+    }
 }
+
+// Decoding HashMap<MetaKey, Value>:
+// let (key, offset, len) = header.decode_next_key();
+// match key {
+//      Metakey::Subject => Subject::decode(&values[offset..len]),
+//      [...]
+// }
 
 // To do this well we will need to implement Serialize/Deserialize by hand. Not too much work
 // though
@@ -116,11 +131,67 @@ pub struct Metadata<'e> {
     /// is already set.
     title: &'e str,
 
-    /// The lifeform, lifeforms or intelligent computer program(s) that created this object.
-    author: Vec<&'e str>,
+    /// The lifeform or intelligent computer program that created this object.
+    author: &'e str,
 
     /// The Filename is relatively often used so we save it as well
     filename: &'e str,
 
-    metamap: HashMap<Metakey, &'e str>,
+    metamap: HashMap<Metakey, &'e [u8]>,
+}
+
+use crate::error::Error;
+
+impl<'e> Metadata<'e> {
+    pub fn new(title: &'e str, author: &'e str, filename: &'e str, metamap: HashMap<Metakey, &'e [u8]>) -> Self {
+        Self {
+            title, author, filename, metamap
+        }
+    }
+
+    #[inline(always)]
+    pub fn decode(bytes: &'e [u8]) -> Result<Self, Error> {
+        bincode::deserialize(bytes).map_err(Error::Bincode)
+    }
+
+    #[inline(always)]
+    pub fn encode_into(&self, bytes: &mut [u8]) -> Result<(), Error> {
+        bincode::serialize_into(bytes, &self).map_err(Error::Bincode)
+    }
+
+    #[inline(always)]
+    pub fn encoded_size(&self) -> Result<u64, Error> {
+        bincode::serialized_size(self).map_err(Error::Bincode)
+    }
+
+    #[inline(always)]
+    pub fn get<T: Meta<'e>>(&self) -> Option<T::Value> {
+        self.metamap.get(&T::KEY).map(|r| T::decode(*r))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn code_metadata_test() {
+        let title = "testtitle";
+        let author = "testauthor";
+        let filename = "testfilename";
+        let subject = "testsubject";
+        let mut metamap = HashMap::new();
+        metamap.insert(Metakey::Subject, subject.as_bytes());
+        let m = Metadata::new(title, author, filename, metamap);
+        println!("{:?}", m);
+
+        let l = m.encoded_size().unwrap() as usize;
+        let mut vec = Vec::with_capacity(l);
+        unsafe { vec.set_len(l) };
+        m.encode_into(&mut vec[..l]).unwrap();
+
+        let n = Metadata::decode(&vec[..l]).unwrap();
+        assert_eq!(m,n);
+        assert_eq!(n.get::<Subject>(), Some(subject));
+    }
 }
