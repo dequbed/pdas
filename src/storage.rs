@@ -71,7 +71,7 @@ pub enum Metakey {
 
 trait Meta<'de> {
     // This way different Metadata can have different Rust representations
-    type Value;
+    type Value: Metavalue<'de>;
     // To implement this properly we need to use `Bytes`-based abstractions; a Metatag is pretty
     // much only a specific block of bytes in the larger block of bytes the DB stores for us at
     // that key. When we have that represented we can encode the Metadata by storing the required
@@ -98,35 +98,44 @@ trait Meta<'de> {
     // For now we're going with the enum variant:
     const KEY: Metakey;
 
-    fn decode(bytes: &'de [u8]) -> Self::Value;
+    #[inline(always)]
+    fn decode(bytes: &'de [u8]) -> Self::Value {
+        Self::Value::decode(bytes)
+    }
+}
+
+trait Metavalue<'de> {
+    fn decode(bytes: &'de [u8]) -> Self;
+}
+
+impl<'de> Metavalue<'de> for &'de str {
+    fn decode(bytes: &'de [u8]) -> Self {
+        unsafe { std::str::from_utf8_unchecked(bytes) }
+    }
 }
 
 pub struct Subject;
 impl<'de> Meta<'de> for Subject {
     type Value = &'de str;
     const KEY: Metakey = Metakey::Subject;
-    fn decode(bytes: &'de [u8]) -> Self::Value {
-        unsafe { std::str::from_utf8_unchecked(bytes) }
-    }
 }
 
 pub struct Description;
 impl<'de> Meta<'de> for Description {
     type Value = &'de str;
     const KEY: Metakey = Metakey::Description;
-    fn decode(bytes: &'de [u8]) -> Self::Value {
-        unsafe { std::str::from_utf8_unchecked(bytes) }
-    }
 }
 
 use chrono::{DateTime, Utc};
+impl<'de> Metavalue<'de> for DateTime<Utc> {
+    fn decode(bytes: &'de [u8]) -> Self {
+        bincode::deserialize(bytes).unwrap()
+    }
+}
 pub struct Date;
 impl<'de> Meta<'de> for Date {
     type Value = DateTime<Utc>;
     const KEY: Metakey = Metakey::Date;
-    fn decode(bytes: &'de [u8]) -> Self::Value {
-        bincode::deserialize(bytes).unwrap()
-    }
 }
 
 // NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,
