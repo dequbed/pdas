@@ -463,3 +463,16 @@ impl<'env> Iterator for IndexIter<'env> {
         }
     }
 }
+
+// More sensible: What defines a Database in our context?
+// 1. What Key-Type they use (MetaDB: SHA256E, TermDB: String)
+// 2. What Value-Type they use (MetaDB: MetaValue, TermDB: TermOccurance)
+// 3. Are they duplicate key types? (i.e. What kind of iterator do they use)
+// 4. In general, what is their configuration like?
+//
+// A database uses bytestrings as Keys and Values. In Rust we can easily build that as DB<K:
+// AsRef<[u8]>, V: AsRef<[u8]>>, i.e. generic over any type K and V that can both be dereferenced
+// into bytestrings.
+// A specific database (e.g. Metadata storage) is a composed struct that contains a version of that
+// generic DB with both K and (maybe?) V bound to a specifc type. They should also define a custom
+// wrapper around new() that enables them to configure the flags the DB is created with.
