@@ -85,7 +85,7 @@ trait Meta<'de> {
     // When you want to implement a new Metatag you add
     // ```rust
     // struct Metatag;
-    // impl Metavalue for Metatag {
+    // impl Meta for Metatag {
     //     type Value = u64;
     // }
     // ```
@@ -95,21 +95,32 @@ trait Meta<'de> {
     // One goal is that if new metadata types are added later on the application can still read
     // tags from previous versions. In the case of the tag that means that a value should keep it's
     // tag once it has been assigned
-} 
+}
 
+use std::marker::PhantomData;
+pub struct Subject;
+impl<'de> Meta<'de> for Subject {
+    type Value = &'de str;
+}
+
+// To do this well we will need to implement Serialize/Deserialize by hand. Not too much work
+// though
+
+// NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,
+// but reading must not need to copy or do expensive decoding operations
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Metadata {
+pub struct Metadata<'e> {
     /// A human-readable identifier for this object. The tile will be tokenized and indexed, so
     /// it may contain several words.
     /// It should not contain redundant information, e.g. name the author when the 'author' field
     /// is already set.
-    title: String,
+    title: &'e str,
 
     /// The lifeform, lifeforms or intelligent computer program(s) that created this object.
-    author: Vec<String>,
+    author: Vec<&'e str>,
 
     /// The Filename is relatively often used so we save it as well
-    filename: String,
+    filename: &'e str,
 
-    metamap: HashMap<Metakey, String>,
+    metamap: HashMap<Metakey, &'e str>,
 }
