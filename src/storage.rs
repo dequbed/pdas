@@ -119,6 +119,16 @@ impl<'de> Meta<'de> for Description {
     }
 }
 
+use chrono::{DateTime, Utc};
+pub struct Date;
+impl<'de> Meta<'de> for Date {
+    type Value = DateTime<Utc>;
+    const KEY: Metakey = Metakey::Date;
+    fn decode(bytes: &'de [u8]) -> Self::Value {
+        bincode::deserialize(bytes).unwrap()
+    }
+}
+
 // NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,
 // but reading must not need to copy or do expensive decoding operations
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
