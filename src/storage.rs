@@ -71,8 +71,7 @@ pub enum Metakey {
 
 trait Meta<'de> {
     // This way different Metadata can have different Rust representations
-    type Value: Serialize + Deserialize<'de>;
-    const KEY: Metakey;
+    type Value;
     // To implement this properly we need to use `Bytes`-based abstractions; a Metatag is pretty
     // much only a specific block of bytes in the larger block of bytes the DB stores for us at
     // that key. When we have that represented we can encode the Metadata by storing the required
@@ -96,30 +95,29 @@ trait Meta<'de> {
     // tags from previous versions. In the case of the tag that means that a value should keep it's
     // tag once it has been assigned
 
+    // For now we're going with the enum variant:
+    const KEY: Metakey;
+
     fn decode(bytes: &'de [u8]) -> Self::Value;
 }
 
-use std::marker::PhantomData;
 pub struct Subject;
 impl<'de> Meta<'de> for Subject {
     type Value = &'de str;
-
     const KEY: Metakey = Metakey::Subject;
-
     fn decode(bytes: &'de [u8]) -> Self::Value {
         unsafe { std::str::from_utf8_unchecked(bytes) }
     }
 }
 
-// Decoding HashMap<MetaKey, Value>:
-// let (key, offset, len) = header.decode_next_key();
-// match key {
-//      Metakey::Subject => Subject::decode(&values[offset..len]),
-//      [...]
-// }
-
-// To do this well we will need to implement Serialize/Deserialize by hand. Not too much work
-// though
+pub struct Description;
+impl<'de> Meta<'de> for Description {
+    type Value = &'de str;
+    const KEY: Metakey = Metakey::Description;
+    fn decode(bytes: &'de [u8]) -> Self::Value {
+        unsafe { std::str::from_utf8_unchecked(bytes) }
+    }
+}
 
 // NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,
 // but reading must not need to copy or do expensive decoding operations
