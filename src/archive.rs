@@ -8,14 +8,13 @@ use clap::{App, ArgMatches};
 
 use std::collections::HashMap;
 
-use lmdb::Transaction;
-
+use crate::error::Error;
 use crate::decoders::Decoder;
 use crate::Librarian;
 use crate::git;
 use rust_stemmers::{Algorithm, Stemmer};
 
-use crate::database::{Key, Metadatabase, RwTransaction};
+use crate::database::{Key, Metadatabase, RwTransaction, Transaction, Stringindexdb, SHA256E, Occurance};
 use crate::storage::MetadataOwned;
 
 pub const SUBCOMMAND: &str = "archive";
@@ -99,6 +98,7 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
     }
 
     let db = Metadatabase::new(lib.dbm.create_named("main").unwrap());
+    let dbi = Stringindexdb::new(lib.dbm.create_named("title").unwrap());
 
     let en_stem = Stemmer::create(Algorithm::English);
 
@@ -112,6 +112,51 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
 
 }
 
+fn index<T: Transaction>(db: Stringindexdb, r: &T, w: &mut RwTransaction, s: &Stemmer, key: SHA256E, val: &MetadataOwned) {
+    let title = val.title.to_lowercase();
+    let words = title.split_whitespace();
+    let wordsc = words.map(|s| s.trim_matches(|c: char| !c.is_alphanumeric()));
+    let wordstems = wordsc.map(|w| s.stem(w));
+
+    let fillwords = wordstems.filter(|s| !is_stopword(s));
+    let filtered = fillwords.filter(|s| !s.is_empty());
+
+    let mut map = HashMap::<String, Vec<u32>>::new();
+
+    for (pos, stem) in filtered.enumerate() {
+        let t = &stem;
+
+        match db.iter(r, t) {
+            Err(Error::LMDB(lmdb::Error::NotFound)) => {}
+            Ok(iter) => {
+                let mut w = w.begin_nested_txn().unwrap();
+                for o in iter {
+                    match o {
+                        Ok((_, o)) => match bincode::deserialize::<Occurance>(o) {
+                            Ok(ref o) if o.key == key => { db.delete(&mut w, &t, &o).unwrap(); },
+                            Ok(_) => {},
+                            Err(e) => error!("while decoding Occurance: {:?}", e),
+                        }
+                        Err(e) => error!("while reading from db: {:?}", e),
+                    }
+                }
+            },
+            Err(e) => {
+                error!("while reading index: {:?}", e);
+                break;
+            },
+        }
+
+        map.entry(t.to_string())
+            .and_modify(|v| v.push(pos as u32))
+            .or_insert(vec![pos as u32]);
+    }
+
+    for (term, pos) in map.into_iter() {
+        let o = Occurance { key: key, occurance: pos };
+        db.put(w, &term, &o).unwrap();
+    }
+}
 
 use std::collections::HashSet;
 

@@ -1,14 +1,10 @@
-use std::path::Path;
 use std::fs::File;
-
 use std::ffi::OsStr;
 
-use super::DecodeError;
 
 use metaflac::Tag as FlacTag;
 use id3::Tag as Id3Tag;
 
-use crate::storage::Song;
 use crate::storage::{MetadataOwned, Metakey};
 
 use std::collections::HashMap;
@@ -18,6 +14,8 @@ use crate::error::Result;
 use std::iter::Iterator;
 
 use std::path::PathBuf;
+
+use super::DecodeError;
 
 pub struct FlacDecoder<I> {
     paths: I,
@@ -38,8 +36,8 @@ impl<I: Iterator<Item=PathBuf>> Iterator for FlacDecoder<I> {
                         let filename = p.file_name().and_then(OsStr::to_str).map(str::to_string).unwrap();
                         let title = vc.title().map(|v| v.get(0).map(|s| s.clone()).unwrap())
                                 .unwrap_or_else(|| filename.clone());
-                        let author = vc.artist().map(|v| v[0].clone()).unwrap_or_else(|| "Unknown".to_string());
-                        let filesize = f.metadata().unwrap().len();
+                        let author = vc.artist().map(|v| v[0].clone());
+                        let filesize = f.metadata().ok().map(|m| m.len() as usize);
 
                         let mut metamap = HashMap::new();
 
@@ -54,11 +52,11 @@ impl<I: Iterator<Item=PathBuf>> Iterator for FlacDecoder<I> {
                             metamap.insert(Metakey::Genre, genbuf);
                         }
                         if let Some(track) = vc.track() {
-                            let mut buf = Box::new(track.to_le_bytes());
+                            let buf = Box::new(track.to_le_bytes());
                             metamap.insert(Metakey::Track, buf);
                         }
                         if let Some(ttrack) = vc.total_tracks() {
-                            let mut buf = Box::new(ttrack.to_le_bytes());
+                            let buf = Box::new(ttrack.to_le_bytes());
                             metamap.insert(Metakey::Totaltracks, buf);
                         }
                         if let Some(albumartist) = vc.album_artist() { 
@@ -67,7 +65,7 @@ impl<I: Iterator<Item=PathBuf>> Iterator for FlacDecoder<I> {
                             metamap.insert(Metakey::Albumartist, albuf);
                         }
 
-                        let m = MetadataOwned::new(title, author, filename, filesize as usize, metamap);
+                        let m = MetadataOwned::new(title, author, filename, filesize, metamap);
                         return Some(Ok(m));
                     }
                 }
@@ -97,15 +95,12 @@ impl<I: Iterator<Item=PathBuf>> Iterator for Id3Decoder<I> {
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(p) = self.paths.next() {
             let f = File::open(&p).unwrap();
-
-            let tag = Id3Tag::read_from(&f);
-
-            match tag {
+            match Id3Tag::read_from(&f) {
                 Ok(tag) => {
                     let filename = p.file_name().and_then(OsStr::to_str).map(str::to_string).unwrap();
                     let title = tag.title().unwrap_or_else(|| &filename).to_string();
-                    let author = tag.artist().unwrap_or_else(|| "Unknown").to_string();
-                    let filesize = f.metadata().unwrap().len();
+                    let author = tag.artist().map(|s| s.to_string());
+                    let filesize = f.metadata().ok().map(|m| m.len() as usize);
 
                     let mut metamap = HashMap::new();
 
@@ -118,11 +113,11 @@ impl<I: Iterator<Item=PathBuf>> Iterator for Id3Decoder<I> {
                         metamap.insert(Metakey::Genre, genbuf);
                     }
                     if let Some(track) = tag.track() {
-                        let mut buf = Box::new(track.to_le_bytes());
+                        let buf = Box::new(track.to_le_bytes());
                         metamap.insert(Metakey::Track, buf);
                     }
                     if let Some(ttrack) = tag.total_tracks() {
-                        let mut buf = Box::new(ttrack.to_le_bytes());
+                        let buf = Box::new(ttrack.to_le_bytes());
                         metamap.insert(Metakey::Totaltracks, buf);
                     }
                     if let Some(artist) = tag.album_artist() { 
@@ -130,7 +125,7 @@ impl<I: Iterator<Item=PathBuf>> Iterator for Id3Decoder<I> {
                         metamap.insert(Metakey::Albumartist, albuf);
                     }
 
-                    let m = MetadataOwned::new(title, author, filename, filesize as usize, metamap);
+                    let m = MetadataOwned::new(title, author, filename, filesize, metamap);
                     return Some(Ok(m));
                 }
                 Err(e) => {

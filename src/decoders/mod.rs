@@ -96,24 +96,18 @@ impl Decoder {
 
         for (k,v) in map.iter() {
             match *k {
-                /*
-                 *FT::PDF => {
-                 *    let mut r = PdfDecoder::decode(v)
-                 *        .into_iter()
-                 *        .map(Storables::Text)
-                 *        .map(Ok)
-                 *        .collect();
-                 *    out.append(&mut r);
-                 *},
-                 *FT::EPUB => {
-                 *    let mut r = EpubDecoder::decode(v)
-                 *        .into_iter()
-                 *        .map(Storables::Text)
-                 *        .map(Ok)
-                 *        .collect();
-                 *    out.append(&mut r);
-                 *},
-                 */
+                FT::PDF => {
+                    //FIXME I shouldn't need to clone here.
+                    let pbi = v.iter().map(|p| Path::to_path_buf(p));
+                    let mut r = PdfDecoder::new(pbi);
+                    out.extend(&mut r);
+                },
+                FT::EPUB => {
+                    //FIXME I shouldn't need to clone here.
+                    let pbi = v.iter().map(|p| Path::to_path_buf(p));
+                    let mut r = EpubDecoder::new(pbi);
+                    out.extend(&mut r);
+                },
                 FT::FLAC => {
                     //FIXME I shouldn't need to clone here.
                     let pbi = v.iter().map(|p| Path::to_path_buf(p));
@@ -137,7 +131,8 @@ impl Decoder {
 #[derive(Debug)]
 pub enum DecodeError {
     Metaflac(metaflac::Error),
-    Id3(id3::Error)
+    Id3(id3::Error),
+    Epub,
 }
 impl From<metaflac::Error> for DecodeError {
     fn from(e: metaflac::Error) -> Self {

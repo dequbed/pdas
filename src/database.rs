@@ -53,7 +53,7 @@ impl Manager {
 }
 
 /// Keytype for the Metadatabase
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SHA256E([u8; 32]);
 impl AsRef<[u8]> for SHA256E {
     fn as_ref(&self) -> &[u8] {
@@ -166,14 +166,24 @@ impl Stringindexdb {
         self.get_bytes(txn, &key).and_then(|buf| bincode::deserialize::<Occurance>(buf).map_err(Error::Bincode))
     }
 
-    pub fn put<'txn>(self, txn: &'txn mut RwTransaction, key: &str, value: Occurance) -> Result<()> {
-        let len = bincode::serialized_size(&value)? as usize;
+    pub fn put<'txn>(self, txn: &'txn mut RwTransaction, key: &str, value: &Occurance) -> Result<()> {
+        let len = bincode::serialized_size(value)? as usize;
         let buf = self.reserve_bytes(txn, &key, len, WriteFlags::empty())?;
-        bincode::serialize_into(buf, &value).map_err(Error::Bincode)
+        bincode::serialize_into(buf, value).map_err(Error::Bincode)
     }
 
     pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<IterDup<'txn>> {
         let mut cursor = txn.open_ro_cursor(self.db)?;
         Ok(cursor.iter_dup_start())
+    }
+
+    pub fn iter<'txn, T: Transaction>(self, txn: &'txn T, key: &str) -> Result<Iter<'txn>> {
+        let mut cursor = txn.open_ro_cursor(self.db)?;
+        Ok(cursor.iter_dup_of(key))
+    }
+
+    pub fn delete<'txn>(self, txn: &'txn mut RwTransaction, key: &str, value: &Occurance) -> Result<()> {
+        let val = bincode::serialize(value)?;
+        txn.del(self.db, &key, Some(&val)).map_err(Error::LMDB)
     }
 }

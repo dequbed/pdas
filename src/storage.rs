@@ -155,14 +155,15 @@ pub struct MetadataS<S, B> {
     pub title: S,
 
     /// The lifeform or intelligent computer program that created this object.
-    pub author: S,
+    // Sadly we don't always have an author in the metadata
+    pub author: Option<S>,
 
     /// The Filename is relatively often used so we save it as well
     pub filename: S,
 
 
     /// the size in bytes of the object this data belongs to
-    pub filesize: usize,
+    pub filesize: Option<usize>,
 
     metamap: HashMap<Metakey, B>,
 }
@@ -173,7 +174,7 @@ impl<'e, S, B> MetadataS<S, B>
     where S: Serialize + Deserialize<'e> + AsRef<str>,
           B: Serialize + Deserialize<'e> + AsRef<[u8]>,
 {
-    pub fn new(title: S, author: S, filename: S, filesize: usize, metamap: HashMap<Metakey, B>) -> Self {
+    pub fn new(title: S, author: Option<S>, filename: S, filesize: Option<usize>, metamap: HashMap<Metakey, B>) -> Self {
         Self {
             title, author, filename, filesize, metamap
         }

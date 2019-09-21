@@ -126,15 +126,6 @@ fn find<T: Transaction>(db: Metadatabase, dbi: Stringindexdb, r: T, needle: &str
     }
 }
 
-fn val(c: u8) -> u8 {
-    match c {
-        b'A'...b'F' => c - b'A' + 10,
-        b'a'...b'f' => c - b'a' + 10,
-        b'0'...b'9' => c - b'0',
-        _ => 0
-    }
-}
-
 // More sensible: What defines a Database in our context?
 // 1. What Key-Type they use (MetaDB: SHA256E, TermDB: String)
 // 2. What Value-Type they use (MetaDB: MetaValue, TermDB: TermOccurance)
