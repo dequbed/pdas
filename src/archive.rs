@@ -105,7 +105,7 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
     for (k,v) in combined.into_iter() {
         let r = lib.dbm.read().unwrap();
         let mut w = lib.dbm.write().unwrap();
-        //index(dbi, &r, &mut w, &en_stem, k, &v);
+        index(dbi, &r, &mut w, &en_stem, k, &v);
         store(db, &mut w, &k, v);
         w.commit().unwrap();
     }
