@@ -117,20 +117,15 @@ impl Decoder {
                 FT::FLAC => {
                     //FIXME I shouldn't need to clone here.
                     let pbi = v.iter().map(|p| Path::to_path_buf(p));
-                    let mut r = FlacDecoder::new(pbi)
-                        .collect();
-                    out.append(&mut r);
+                    let mut r = FlacDecoder::new(pbi);
+                    out.extend(&mut r);
                 },
-                /*
-                 *FT::MPEG => {
-                 *    let mut r = Id3Decoder::decode(v)
-                 *        .into_iter()
-                 *        .map(Storables::Audio)
-                 *        .map(Ok)
-                 *        .collect();
-                 *    out.append(&mut r);
-                 *},
-                 */
+                FT::MPEG => {
+                    //FIXME I shouldn't need to clone here.
+                    let pbi = v.iter().map(|p| Path::to_path_buf(p));
+                    let mut r = Id3Decoder::new(pbi);
+                    out.extend(&mut r);
+                },
                 _ => {}
             }
         }
@@ -141,10 +136,16 @@ impl Decoder {
 
 #[derive(Debug)]
 pub enum DecodeError {
-    Metaflac(metaflac::Error)
+    Metaflac(metaflac::Error),
+    Id3(id3::Error)
 }
 impl From<metaflac::Error> for DecodeError {
     fn from(e: metaflac::Error) -> Self {
         DecodeError::Metaflac(e)
+    }
+}
+impl From<id3::Error> for DecodeError {
+    fn from(e: id3::Error) -> Self {
+        DecodeError::Id3(e)
     }
 }
