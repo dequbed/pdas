@@ -26,13 +26,6 @@ extern crate toml;
 
 extern crate rust_stemmers;
 
-#[cfg(test)]
-extern crate quickcheck;
-#[cfg(test)]
-#[macro_use(quickcheck)]
-extern crate quickcheck_macros;
-
-
 use std::path::PathBuf;
 use directories::ProjectDirs;
 use std::fs::File;

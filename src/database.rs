@@ -1,5 +1,5 @@
-use crate::error::Error;
-use crate::storage::Metadata;
+use crate::error::{Result, Error};
+use crate::storage::{Metadata, MetadataS};
 use serde::{Serialize, Deserialize};
 use libc::size_t;
 
@@ -12,6 +12,10 @@ pub use lmdb::{
     RoTransaction,
     RwTransaction,
     WriteFlags,
+    RoCursor,
+    Cursor,
+    Iter,
+    IterDup,
 };
 
 use std::path::Path;
@@ -116,10 +120,18 @@ impl Metadatabase {
         self.get_bytes(txn, key).and_then(Metadata::decode)
     }
 
-    pub fn put<'txn>(self, txn: &'txn mut RwTransaction, key: &Key, m: Metadata) -> Result<()> {
+    pub fn put<'txn, S, B>(self, txn: &'txn mut RwTransaction, key: &Key, m: MetadataS<S,B>) -> Result<()> 
+        where S: AsRef<str> + Serialize + Deserialize<'txn>,
+              B: AsRef<[u8]> + Serialize + Deserialize<'txn>
+    {
         let len = m.encoded_size()? as usize;
         let buf = self.reserve_bytes(txn, key, len, WriteFlags::empty())?;
         m.encode_into(buf)
+    }
+
+    pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<Iter<'txn>> {
+        let mut cursor = txn.open_ro_cursor(self.db)?;
+        Ok(cursor.iter_start())
     }
 }
 
@@ -158,5 +170,10 @@ impl Stringindexdb {
         let len = bincode::serialized_size(&value)? as usize;
         let buf = self.reserve_bytes(txn, &key, len, WriteFlags::empty())?;
         bincode::serialize_into(buf, &value).map_err(Error::Bincode)
+    }
+
+    pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<IterDup<'txn>> {
+        let mut cursor = txn.open_ro_cursor(self.db)?;
+        Ok(cursor.iter_dup_start())
     }
 }

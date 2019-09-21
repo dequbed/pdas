@@ -69,7 +69,7 @@ pub enum Metakey {
 // Value -> (Tag, &[u8])
 // (Tag, &[u8]) -> Value
 
-trait Meta<'de> {
+pub trait Meta<'de> {
     // This way different Metadata can have different Rust representations
     type Value: Metavalue<'de>;
     // To implement this properly we need to use `Bytes`-based abstractions; a Metatag is pretty
@@ -104,7 +104,7 @@ trait Meta<'de> {
     }
 }
 
-trait Metavalue<'de> {
+pub trait Metavalue<'de> {
     fn decode(bytes: &'de [u8]) -> Self;
 }
 
@@ -147,30 +147,33 @@ impl<'de> Meta<'de> for Identifier {
 // NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,
 // but reading must not need to copy or do expensive decoding operations
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Metadata<'e> {
+pub struct MetadataS<S, B> {
     /// A human-readable identifier for this object. The tile will be tokenized and indexed, so
     /// it may contain several words.
     /// It should not contain redundant information, e.g. name the author when the 'author' field
     /// is already set.
-    pub title: &'e str,
+    pub title: S,
 
     /// The lifeform or intelligent computer program that created this object.
-    pub author: &'e str,
+    pub author: S,
 
     /// The Filename is relatively often used so we save it as well
-    pub filename: &'e str,
+    pub filename: S,
 
 
     /// the size in bytes of the object this data belongs to
     pub filesize: usize,
 
-    metamap: HashMap<Metakey, &'e [u8]>,
+    metamap: HashMap<Metakey, B>,
 }
 
 use crate::error::Error;
 
-impl<'e> Metadata<'e> {
-    pub fn new(title: &'e str, author: &'e str, filename: &'e str, filesize: usize, metamap: HashMap<Metakey, &'e [u8]>) -> Self {
+impl<'e, S, B> MetadataS<S, B> 
+    where S: Serialize + Deserialize<'e> + AsRef<str>,
+          B: Serialize + Deserialize<'e> + AsRef<[u8]>,
+{
+    pub fn new(title: S, author: S, filename: S, filesize: usize, metamap: HashMap<Metakey, B>) -> Self {
         Self {
             title, author, filename, filesize, metamap
         }
@@ -192,10 +195,13 @@ impl<'e> Metadata<'e> {
     }
 
     #[inline(always)]
-    pub fn get<T: Meta<'e>>(&self) -> Option<T::Value> {
-        self.metamap.get(&T::KEY).map(|r| T::decode(*r))
+    pub fn get<T: Meta<'e>>(&'e self) -> Option<T::Value> {
+        self.metamap.get(&T::KEY).map(|r: &B| T::decode(r.as_ref()))
     }
 }
+
+pub type Metadata<'e> = MetadataS<&'e str, &'e [u8]>;
+pub type MetadataOwned = MetadataS<String, Box<[u8]>>;
 
 #[cfg(test)]
 mod tests {
@@ -203,23 +209,31 @@ mod tests {
 
     #[test]
     fn code_metadata_test() {
-        let title = "testtitle";
-        let author = "testauthor";
-        let filename = "testfilename";
-        let subject = "testsubject";
+        let title = "testtitle".to_string();
+        let author = "testauthor".to_string();
+        let filename = "testfilename".to_string();
+        let subject = "testsubject".to_string().into_boxed_str().into_boxed_bytes();
         let filesize = 361567;
         let mut metamap = HashMap::new();
-        metamap.insert(Metakey::Subject, subject.as_bytes());
-        let m = Metadata::new(title, author, filename, filesize, metamap);
+        metamap.insert(Metakey::Subject, subject);
+        let m = MetadataOwned::new(title, author, filename, filesize, metamap);
         println!("{:?}", m);
 
         let l = m.encoded_size().unwrap() as usize;
-        let mut vec = Vec::with_capacity(l);
+        let mut vec: Vec<u8> = Vec::with_capacity(l);
         unsafe { vec.set_len(l) };
+        let mut vec = vec.into_boxed_slice();
         m.encode_into(&mut vec[..l]).unwrap();
 
         let n = Metadata::decode(&vec[..l]).unwrap();
-        assert_eq!(m,n);
-        assert_eq!(n.get::<Subject>(), Some(subject));
+
+        let subject = n.get::<Subject>().unwrap();
+
+        let vecstart: *const u8 = vec.as_ptr();
+        println!("The buffer starts at {:p} and is {} bytes long", vecstart, vec.len());
+        println!("&title: {:p}, &author: {:p}, &map.subject: {:p}", n.title, n.author, subject);
+        println!("{:?}", n);
+
+        assert!(false);
     }
 }

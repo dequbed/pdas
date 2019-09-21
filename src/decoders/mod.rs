@@ -18,7 +18,7 @@ use clap::{App, ArgMatches};
 use log::Level::*;
 
 pub use crate::storage::Storables;
-use crate::storage::Metadata;
+use crate::storage::MetadataOwned;
 
 pub const SUBCOMMAND: &str = "read";
 
@@ -51,8 +51,8 @@ enum FT {
 pub struct Decoder;
 
 impl Decoder {
-    pub fn decode(files: &[PathBuf]) -> Vec<Result<Metadata, Error>> {
-        let mut out: Vec<Result<Metadata, Error>> = Vec::with_capacity(files.len());
+    pub fn decode(files: &[PathBuf]) -> Vec<Result<MetadataOwned, Error>> {
+        let mut out: Vec<Result<MetadataOwned, Error>> = Vec::with_capacity(files.len());
         let mut map: HashMap<FT, Vec<&Path>> = HashMap::new();
 
         for f in files {
@@ -96,38 +96,41 @@ impl Decoder {
 
         for (k,v) in map.iter() {
             match *k {
-                FT::PDF => {
-                    let mut r = PdfDecoder::decode(v)
-                        .into_iter()
-                        .map(Storables::Text)
-                        .map(Ok)
-                        .collect();
-                    out.append(&mut r);
-                },
-                FT::EPUB => {
-                    let mut r = EpubDecoder::decode(v)
-                        .into_iter()
-                        .map(Storables::Text)
-                        .map(Ok)
-                        .collect();
-                    out.append(&mut r);
-                },
+                /*
+                 *FT::PDF => {
+                 *    let mut r = PdfDecoder::decode(v)
+                 *        .into_iter()
+                 *        .map(Storables::Text)
+                 *        .map(Ok)
+                 *        .collect();
+                 *    out.append(&mut r);
+                 *},
+                 *FT::EPUB => {
+                 *    let mut r = EpubDecoder::decode(v)
+                 *        .into_iter()
+                 *        .map(Storables::Text)
+                 *        .map(Ok)
+                 *        .collect();
+                 *    out.append(&mut r);
+                 *},
+                 */
                 FT::FLAC => {
-                    let mut r = FlacDecoder::decode(v)
-                        .into_iter()
-                        .map(Storables::Audio)
-                        .map(Ok)
+                    //FIXME I shouldn't need to clone here.
+                    let pbi = v.iter().map(|p| Path::to_path_buf(p));
+                    let mut r = FlacDecoder::new(pbi)
                         .collect();
                     out.append(&mut r);
                 },
-                FT::MPEG => {
-                    let mut r = Id3Decoder::decode(v)
-                        .into_iter()
-                        .map(Storables::Audio)
-                        .map(Ok)
-                        .collect();
-                    out.append(&mut r);
-                },
+                /*
+                 *FT::MPEG => {
+                 *    let mut r = Id3Decoder::decode(v)
+                 *        .into_iter()
+                 *        .map(Storables::Audio)
+                 *        .map(Ok)
+                 *        .collect();
+                 *    out.append(&mut r);
+                 *},
+                 */
                 _ => {}
             }
         }
@@ -142,6 +145,6 @@ pub enum DecodeError {
 }
 impl From<metaflac::Error> for DecodeError {
     fn from(e: metaflac::Error) -> Self {
-        Error::Metaflac(e)
+        DecodeError::Metaflac(e)
     }
 }

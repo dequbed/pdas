@@ -35,3 +35,8 @@ impl From<json::Error> for Error {
         Error::Json(e)
     }
 }
+impl From<decoders::DecodeError> for Error {
+    fn from(e: decoders::DecodeError) -> Self {
+        Error::Decode(e)
+    }
+}

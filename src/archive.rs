@@ -16,7 +16,7 @@ use crate::git;
 use rust_stemmers::{Algorithm, Stemmer};
 
 use crate::database::{Key, Metadatabase, RwTransaction};
-use crate::storage::Metadata;
+use crate::storage::MetadataOwned;
 
 pub const SUBCOMMAND: &str = "archive";
 
@@ -56,7 +56,7 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
     let keys = git::annex_add(&pb).unwrap();
     info!("Annexed files");
 
-    let mut combined: Vec<(Key, Metadata)> = Vec::new();
+    let mut combined: Vec<(Key, MetadataOwned)> = Vec::new();
     let mut keymap = HashMap::<&str, Key>::new();
 
     if !meta.is_empty() {
@@ -131,6 +131,6 @@ fn is_stopword(word: &str) -> bool {
     STOPWORDS.contains(word)
 }
 
-fn store(db: Metadatabase, w: &mut RwTransaction, key: &Key, val: Metadata) {
+fn store(db: Metadatabase, w: &mut RwTransaction, key: &Key, val: MetadataOwned) {
     db.put(w, key, val).unwrap();
 }

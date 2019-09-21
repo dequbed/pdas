@@ -1,11 +1,15 @@
 use clap::{App, ArgMatches};
 
+use lmdb::{Iter, IterDup};
+
+use crate::storage::Metadata;
+
 use rust_stemmers::{Algorithm, Stemmer};
 
 use crate::Librarian;
 use crate::error::Error;
 
-use crate::database::{Key, Metadatabase, Stringindexdb, Transaction};
+use crate::database::{Key, Metadatabase, Stringindexdb, Transaction, Occurance};
 
 pub fn clap() -> App<'static, 'static> {
     clap_app!( @subcommand db =>
@@ -49,17 +53,46 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
             let r = lib.dbm.read().unwrap();
 
             let c = db.iter_start(&r).unwrap();
+            if let Iter::Err(e) = c {
+                error!("Iterator errored out, aborting: {:?}", e);
+                return;
+            }
 
             for i in c {
-                println!("{:?}", i);
+                match i {
+                    Ok((kref, vref)) => {
+                        let m = Metadata::decode(vref);
+                        println!("{:?}: {:?}", kref, m);
+                    },
+                    Err(e) => {
+                        error!("Retrieval errored out: {:?}", e);
+                    }
+                }
             }
         }
         ("index", _) => {
             let idb = Stringindexdb::new(lib.dbm.create_named("title").unwrap());
             let r = lib.dbm.read().unwrap();
             let is = idb.iter_start(&r).unwrap();
+
+            if let IterDup::Err(e) = is {
+                error!("Iterator errored out, aborting: {:?}", e);
+                return;
+            }
+
             for i in is.flatten() {
-                println!("{:?}", i);
+                match i {
+                    Ok((kref, vref)) => {
+                        let r: Result<Occurance, Error> = bincode::deserialize(vref).map_err(Error::Bincode);
+                        match r {
+                            Ok(o) => println!("{:?}: {:?}", kref, o),
+                            Err(e) => error!("Failed to decode index value: {:?}", e),
+                        }
+                    },
+                    Err(e) => {
+                        error!("Retrieval errored out: {:?}", e);
+                    }
+                }
             }
         }
         ("search", Some(a)) => {
