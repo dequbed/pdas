@@ -8,14 +8,15 @@ use clap::{App, ArgMatches};
 
 use std::collections::HashMap;
 
+use lmdb::Transaction;
+
 use crate::decoders::Decoder;
-use crate::decoders::Storables;
 use crate::Librarian;
 use crate::git;
-use crate::db;
-use crate::error::Error;
-
 use rust_stemmers::{Algorithm, Stemmer};
+
+use crate::database::{Key, Metadatabase, RwTransaction};
+use crate::storage::Metadata;
 
 pub const SUBCOMMAND: &str = "archive";
 
@@ -55,8 +56,8 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
     let keys = git::annex_add(&pb).unwrap();
     info!("Annexed files");
 
-    let mut combined: Vec<(db::SHA256E, Storables)> = Vec::new();
-    let mut keymap = HashMap::<&str, db::SHA256E>::new();
+    let mut combined: Vec<(Key, Metadata)> = Vec::new();
+    let mut keymap = HashMap::<&str, Key>::new();
 
     if !meta.is_empty() {
 
@@ -97,71 +98,20 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
         }
     }
 
-    let db = lib.dbm.create().unwrap();
-    let dbi = lib.dbm.create_index().unwrap();
+    let db = Metadatabase::new(lib.dbm.create_named("main").unwrap());
 
     let en_stem = Stemmer::create(Algorithm::English);
 
     for (k,v) in combined.into_iter() {
         let r = lib.dbm.read().unwrap();
         let mut w = lib.dbm.write().unwrap();
-        index(dbi, &r, &mut w, &en_stem, k, &v);
-        store(db, &mut w, &k, &v);
+        //index(dbi, &r, &mut w, &en_stem, k, &v);
+        store(db, &mut w, &k, v);
         w.commit().unwrap();
     }
 
 }
 
-
-fn index(db: db::TermDatabase, r: &db::Reader, w: &mut db::Writer, s: &Stemmer, key: db::SHA256E, val: &Storables) {
-    let title = val.title().to_lowercase();
-    let words = title.split_whitespace();
-    let wordsc = words.map(|s| s.trim_matches(|c: char| !c.is_alphanumeric()));
-    let wordstems = wordsc.map(|w| s.stem(w));
-
-    let fillwords = wordstems.filter(|s| !is_stopword(s));
-    let filtered = fillwords.filter(|s| !s.is_empty());
-
-    let mut map: HashMap<db::Term, Vec<u32>> = HashMap::new();
-
-    for (pos, stem) in filtered.enumerate() {
-        let t = db::Term::String(stem.into());
-
-        if let Some(v) = map.get_mut(&t) {
-            v.push(pos as u32);
-        } else {
-            map.insert(t, vec![pos as u32]);
-        }
-    }
-
-    for (term,occ) in map.drain() {
-        let mut sv: Vec<db::TermOccurance>;
-        match db.get(r, &term) {
-            Ok(occv) => {
-                sv = occv.into_iter()
-                    .filter(|to| to.key != key) // Filter records pointing to us.
-                    .collect();
-
-                sv.push(db::TermOccurance {
-                    key,
-                    occ
-                });
-            }, 
-            Err(Error::LMDB(lmdb::Error::NotFound)) => {
-                sv = vec![db::TermOccurance { key, occ }];
-            },
-            Err(e) => {
-                error!("while reading index: {:?}", e);
-                break;
-            }
-        }
-
-        if let Err(e) = db.put(w, &term, sv) {
-            error!("while writing index: {:?}", e);
-        }
-
-    }
-}
 
 use std::collections::HashSet;
 
@@ -181,6 +131,6 @@ fn is_stopword(word: &str) -> bool {
     STOPWORDS.contains(word)
 }
 
-fn store(db: db::ItemDatabase, w: &mut db::Writer, key: &db::SHA256E, val: &Storables) {
+fn store(db: Metadatabase, w: &mut RwTransaction, key: &Key, val: Metadata) {
     db.put(w, key, val).unwrap();
 }

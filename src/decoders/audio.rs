@@ -7,10 +7,52 @@ use metaflac::Tag as FlacTag;
 use id3::Tag as Id3Tag;
 
 use crate::storage::Song;
+use crate::storage::Metadata;
+use std::marker::PhantomData;
 
-pub struct FlacDecoder;
+use crate::error::{Result, Error};
 
-impl FlacDecoder {
+pub struct FlacDecoder<'xn, I> {
+    paths: I,
+    phantom: PhantomData<Metadata<'xn>>,
+}
+impl<'xn, I: Iterator<Item=&'xn Path>> Iterator for FlacDecoder<'xn, I> {
+    type Item = Result<Metadata<'xn>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(p) = self.paths.next() {
+            let mut f = File::open(p).unwrap();
+            let tag = FlacTag::read_from(&mut f);
+
+            match tag {
+                Ok(t) => {
+                    if let Some(vc) = t.vorbis_comments() {
+                        let title: vc.title().map(|v| v.get(0).map(|s| s.clone()))
+                                .unwrap_or_else(|| p.file_name().and_then(OsStr::to_str).map(str::to_string)).unwrap(),
+                        let m = Metadata::new(&title)
+
+                        rv.push(Song {
+                            artist: vc.artist().map(|v| v.clone()).unwrap_or_else(Vec::new),
+                            album: vc.album().map_or(None, |v| v.get(0).map(|s| s.clone())),
+                            genre: vc.genre().map_or(None, |v| v.get(0).map(|s| s.clone())),
+                            track: vc.track(),
+                            totaltracks: vc.total_tracks(),
+                            albumartist: vc.album_artist().map_or(None, |v| v.get(0).map(|s| s.clone())),
+                            lyrics: vc.lyrics().map_or(None, |v| v.get(0).map(|s| s.clone())),
+                        });
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to read FLAC tag: {}", e);
+                    return Some(Err(e.into().into()));
+                }
+            }
+        }
+
+        return None;
+    }
+}
+impl<'xn, I> FlacDecoder<'xn, I> {
     pub fn decode(paths: &[&Path]) -> Vec<Song> {
         let mut rv = Vec::with_capacity(paths.len());
 

@@ -12,7 +12,7 @@ use std::io::{self, BufReader, BufRead, Write};
 use std::thread;
 
 use crate::Librarian;
-use crate::db::{Key, Backend, SHA256E};
+use crate::database::Key;
 
 pub const SUBCOMMAND: &'static str = "git";
 
@@ -37,7 +37,7 @@ pub fn run(lib: Librarian, args: &ArgMatches) {
     }
 }
 
-pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(SHA256E, String)>, Error> {
+pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(Key, String)>, Error> {
     let mut child = Command::new("git")
         .args(&["annex", "add", "--json", "--json-error-messages", "--batch"])
         .args(&["+RTS", "-N2"])
@@ -66,7 +66,7 @@ pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(SHA256E, String)>, Error> {
 
         Ok(out.iter_mut().map(|j: &mut json::JsonValue| {
             let ks: String = j.remove("key").take_string().unwrap();
-            let k = SHA256E::try_parse(&ks).unwrap();
+            let k = Key::try_parse(&ks).unwrap();
             let p: String = j.remove("file").take_string().unwrap();
             let f: String = std::path::Path::new(&p).file_name().and_then(|p: &std::ffi::OsStr| p.to_str().map(str::to_string)).unwrap();
             (k,f)

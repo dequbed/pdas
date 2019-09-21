@@ -2,7 +2,8 @@ use crate::error::Error;
 use crate::storage::Metadata;
 use serde::{Serialize, Deserialize};
 use libc::size_t;
-use lmdb::{
+
+pub use lmdb::{
     Environment,
     EnvironmentBuilder,
     Database,
@@ -14,8 +15,6 @@ use lmdb::{
 };
 
 use std::path::Path;
-
-type Result<T> = std::result::Result<T, Error>;
 
 pub struct Manager {
     env: Environment
@@ -50,16 +49,48 @@ impl Manager {
 }
 
 /// Keytype for the Metadatabase
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct SHA256E([u8; 32]);
 impl AsRef<[u8]> for SHA256E {
     fn as_ref(&self) -> &[u8] {
         &self.0
     }
 }
+impl SHA256E {
+    pub fn try_parse(s: &str) -> Option<Self> {
+        let mut si = s.split("--");
+        let [a,b]: [&str; 2] = [si.next().unwrap(), si.next().unwrap()];
+        let mut info = a.split('-');
+        if let Some(m) = info.next() {
+            if m == "SHA256E" {
+                if let Some(k) = b.split('.').next() {
+                    let mut inner = [0u8;32];
+
+                    for (idx, pair) in k.as_bytes().chunks(2).enumerate() {
+                        inner[idx] = val(pair[0]) << 4 | val(pair[1])
+                    }
+
+                    return Some(Self(inner));
+                }
+            }
+        }
+
+        None
+    }
+}
+
+fn val(c: u8) -> u8 {
+    match c {
+        b'A'...b'F' => c - b'A' + 10,
+        b'a'...b'f' => c - b'a' + 10,
+        b'0'...b'9' => c - b'0',
+        _ => 0
+    }
+}
+
 
 /// The Key used to reference a Metadata object
-type Key = SHA256E;
+pub type Key = SHA256E;
 
 /// The main metadata storage db
 ///
@@ -94,12 +125,12 @@ impl Metadatabase {
 
 /// An occurance of a term in a document's field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Occurance<'txn> {
+pub struct Occurance {
     /// The key of the document in which the term occurs
-    pub key: &'txn Key,
+    pub key: Key,
     /// The word position where the term occurs in the document. May be multiple if the Term occurs
     /// several times.
-    pub occurance: &'txn [u32],
+    pub occurance: Vec<u32>,
 }
 
 #[derive(Copy, Clone)]
@@ -119,13 +150,13 @@ impl Stringindexdb {
         txn.reserve(self.db, key, len as size_t, flags).map_err(Error::LMDB)
     }
 
-    pub fn get<'txn, T: Transaction>(self, txn: &'txn T, key: &str) -> Result<Occurance<'txn>> {
-        self.get_bytes(txn, key).and_then(|b| std::str::from_utf8(b).map_err(Error::Utf8))
+    pub fn get<'txn, T: Transaction>(self, txn: &'txn T, key: &str) -> Result<Occurance> {
+        self.get_bytes(txn, &key).and_then(|buf| bincode::deserialize::<Occurance>(buf).map_err(Error::Bincode))
     }
 
-    pub fn put<'txn>(self, txn: &'txn mut RwTransaction, key: &str, value: Occurance<'txn>) -> Result<()> {
-        let len = bincode::serialized_size(value)? as usize;
-        let buf = self.reserve_bytes(txn, key, len, WriteFlags::empty())?;
-        bincode::serialize_into(buf, value)
+    pub fn put<'txn>(self, txn: &'txn mut RwTransaction, key: &str, value: Occurance) -> Result<()> {
+        let len = bincode::serialized_size(&value)? as usize;
+        let buf = self.reserve_bytes(txn, &key, len, WriteFlags::empty())?;
+        bincode::serialize_into(buf, &value).map_err(Error::Bincode)
     }
 }

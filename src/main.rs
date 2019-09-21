@@ -26,6 +26,13 @@ extern crate toml;
 
 extern crate rust_stemmers;
 
+#[cfg(test)]
+extern crate quickcheck;
+#[cfg(test)]
+#[macro_use(quickcheck)]
+extern crate quickcheck_macros;
+
+
 use std::path::PathBuf;
 use directories::ProjectDirs;
 use std::fs::File;
@@ -33,6 +40,7 @@ use std::io::Read;
 
 mod archive;
 mod db;
+mod database;
 mod git;
 
 mod decoders;
@@ -84,7 +92,7 @@ fn main() {
 // Main application struct
 pub struct Librarian {
     pub config: config::Config,
-    pub dbm: db::Manager,
+    pub dbm: database::Manager,
 }
 
 impl Librarian {
@@ -113,11 +121,11 @@ impl Librarian {
             Err(e) => error!("Failed to open config file: {}", e),
         }
 
-        let mut dbmb = db::Manager::builder();
-        dbmb.set_flags(db::EnvironmentFlags::MAP_ASYNC | db::EnvironmentFlags::WRITE_MAP);
+        let mut dbmb = database::Manager::builder();
+        dbmb.set_flags(lmdb::EnvironmentFlags::MAP_ASYNC | lmdb::EnvironmentFlags::WRITE_MAP);
         dbmb.set_map_size(10485760);
         dbmb.set_max_dbs(4);
-        let dbm = db::Manager::from_builder(&config.database.basedir, dbmb).unwrap();
+        let dbm = database::Manager::from_builder(&config.database.basedir, dbmb).unwrap();
 
         Librarian {
             config,

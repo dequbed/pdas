@@ -1,25 +1,11 @@
-use std::path::Path;
-
 use clap::{App, ArgMatches};
 
-use lmdb::Cursor;
-use lmdb::Environment;
-use lmdb::EnvironmentBuilder;
-pub use lmdb::EnvironmentFlags;
-use lmdb::WriteFlags;
-use lmdb::DatabaseFlags;
-use lmdb::Transaction;
-use lmdb::{RoCursor, RwCursor};
-use lmdb::{RoTransaction, RwTransaction};
-
 use rust_stemmers::{Algorithm, Stemmer};
-
-use std::rc::Rc;
 
 use crate::Librarian;
 use crate::error::Error;
 
-use crate::decoders::Storables;
+use crate::database::{Key, Metadatabase, Stringindexdb, Transaction};
 
 pub fn clap() -> App<'static, 'static> {
     clap_app!( @subcommand db =>
@@ -39,15 +25,15 @@ pub fn clap() -> App<'static, 'static> {
 }
 
 pub fn run(lib: Librarian, matches: &ArgMatches) {
-    let db = lib.dbm.create().unwrap();
+    let db = Metadatabase::new(lib.dbm.create_named("main").unwrap());
 
     match matches.subcommand() {
         ("read", Some(args)) => {
             let r = lib.dbm.read().unwrap();
 
             if let Some(k) = args.value_of("key") {
-                if let Some(k) = Key::<SHA256E>::try_parse(k) {
-                    match db.get(&r, k) {
+                if let Some(k) = Key::try_parse(k) {
+                    match db.get(&r, &k) {
                         Ok(r) => println!("{:?}", r),
                         Err(e) => error!("Error: {:?}", e),
                     }
@@ -69,17 +55,16 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
             }
         }
         ("index", _) => {
-            let idb = lib.dbm.create_index().unwrap();
+            let idb = Stringindexdb::new(lib.dbm.create_named("title").unwrap());
             let r = lib.dbm.read().unwrap();
             let is = idb.iter_start(&r).unwrap();
-            for i in is {
+            for i in is.flatten() {
                 println!("{:?}", i);
             }
         }
         ("search", Some(a)) => {
             let needle = a.value_of("term").unwrap();
-            let db = lib.dbm.create().unwrap();
-            let idb = lib.dbm.create_index().unwrap();
+            let idb = Stringindexdb::new(lib.dbm.create_named("title").unwrap());
             let r = lib.dbm.read().unwrap();
 
             let res = find(db, idb, r, needle);
@@ -88,17 +73,15 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
     }
 }
 
-fn find(db: ItemDatabase, dbi: TermDatabase, r: Reader, needle: &str) {
+fn find<T: Transaction>(db: Metadatabase, dbi: Stringindexdb, r: T, needle: &str) {
     let en_stem = Stemmer::create(Algorithm::English);
     let ndl = en_stem.stem(needle);
-    let term = Term::String(ndl.into());
+    let term: String = ndl.into();
 
     match dbi.get(&r, &term) {
-        Ok(vec) => {
-            for v in vec {
-                if let Ok(r) = db.get(&r, v.key) {
-                    println!("{:?}", r);
-                }
+        Ok(occ) => {
+            if let Ok(r) = db.get(&r, &occ.key) {
+                println!("{:?}", r);
             }
         }
         Err(Error::LMDB(lmdb::Error::NotFound)) => {
@@ -110,357 +93,12 @@ fn find(db: ItemDatabase, dbi: TermDatabase, r: Reader, needle: &str) {
     }
 }
 
-pub trait Backend: Sized + Copy {
-    type Store: AsRef<[u8]>;
-    fn into_inner(self) -> Self::Store;
-    fn try_parse(s: &str) -> Option<Self>;
-    fn construct(k: &[u8]) -> Option<Self>;
-    fn new() -> Self;
-
-    const NAME: &'static str;
-}
-
-use serde::{Serialize, Deserialize};
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct SHA256E {
-    inner: [u8; 32],
-}
-impl Backend for SHA256E {
-    type Store = [u8; 32];
-
-    fn new() -> Self {
-        SHA256E { inner: [0; 32] }
-    }
-
-    fn into_inner(self) -> Self::Store {
-        self.inner
-    }
-
-    fn construct(k: &[u8]) -> Option<Self> {
-        if k.len() >= 32 {
-            let mut inner: [u8; 32] = Default::default();
-            inner.copy_from_slice(&k[0..32]);
-            Some(Self { inner })
-        } else {
-            None
-        }
-    }
-
-    fn try_parse(s: &str) -> Option<Self> {
-        let mut si = s.split("--");
-        let [a,b]: [&str; 2] = [si.next().unwrap(), si.next().unwrap()];
-        let mut info = a.split('-');
-        if let Some(m) = info.next() {
-            if m == Self::NAME {
-                if let Some(k) = b.split('.').next() {
-                    let mut inner = [0u8;32];
-
-                    for (idx, pair) in k.as_bytes().chunks(2).enumerate() {
-                        inner[idx] = val(pair[0]) << 4 | val(pair[1])
-                    }
-
-                    return Some(Self { inner });
-                }
-            }
-        }
-
-        None
-    }
-
-    const NAME: &'static str = "SHA256E";
-}
-
 fn val(c: u8) -> u8 {
     match c {
         b'A'...b'F' => c - b'A' + 10,
         b'a'...b'f' => c - b'a' + 10,
         b'0'...b'9' => c - b'0',
         _ => 0
-    }
-}
-
-use std::marker::PhantomData;
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Key<T> {
-    phantom: PhantomData<T>,
-}
-
-impl<T: Backend> Key<T> {
-    fn new() -> Self {
-        Self {
-            phantom: PhantomData,
-        }
-    }
-    fn try_parse(s: &str) -> Option<T> {
-        T::try_parse(s)
-    }
-    const NAME: &'static str = T::NAME;
-}
-
-use crate::config::Mech;
-
-impl<T> Key<T> {
-    pub fn lookup(name: Mech) -> Option<Key<impl Backend>> {
-        match name {
-            Mech::SHA256E => Some(Key::<SHA256E>::new()),
-        }
-    }
-}
-
-pub struct Manager {
-    env: Environment
-}
-
-impl Manager {
-    pub fn builder() -> EnvironmentBuilder {
-        Environment::new()
-    }
-
-    pub fn from_builder(path: &Path, env: EnvironmentBuilder) -> Result<Self, Error> {
-        Ok(Self {
-            env: env.open(path).map_err(Error::LMDB)?
-        })
-    }
-
-    pub fn open(&self) -> Result<ItemDatabase, Error> {
-        self.env.open_db(Some("main")).map_err(Error::LMDB).map(ItemDatabase::new)
-    }
-
-    pub fn open_index(&self) -> Result<TermDatabase, Error> {
-        self.env.open_db(Some("index")).map_err(Error::LMDB).map(TermDatabase::new)
-    }
-    pub fn open_named(&self, name: &str) -> Result<lmdb::Database, Error> {
-        self.env.open_db(Some(name)).map_err(Error::LMDB)
-    }
-
-    pub fn create(&self) -> Result<ItemDatabase, Error> {
-        self.env.create_db(Some("main"), DatabaseFlags::empty()).map_err(Error::LMDB).map(ItemDatabase::new)
-    }
-
-    pub fn create_index(&self) -> Result<TermDatabase, Error> {
-        self.env.create_db(Some("index"), DatabaseFlags::empty()).map_err(Error::LMDB).map(TermDatabase::new)
-    }
-    pub fn create_named(&self, name: &str) -> Result<lmdb::Database, Error> {
-        self.env.create_db(Some(name), DatabaseFlags::empty()).map_err(Error::LMDB)
-    }
-
-    pub fn read(&self) -> Result<Reader, Error> {
-        Ok(Reader::new(self.env.begin_ro_txn().map_err(Error::LMDB)?))
-    }
-
-    pub fn write(&self) -> Result<Writer, Error> {
-        Ok(Writer::new(self.env.begin_rw_txn().map_err(Error::LMDB)?))
-    }
-}
-
-pub struct Reader<'env>(pub RoTransaction<'env>);
-pub struct Writer<'env>(pub RwTransaction<'env>);
-
-pub trait ReadTransaction {
-    fn get<K: AsRef<[u8]>, D, T>(&self, db: lmdb::Database, k: &K, op: D) -> Result<T, Error>
-        where D: Fn(&[u8]) -> Result<T, Error>;
-    fn open_ro_cursor(&self, db: lmdb::Database) -> Result<RoCursor, Error>;
-}
-
-impl<'env> Reader<'env> {
-    pub fn new(txn: RoTransaction<'env>) -> Self {
-        Reader(txn)
-    }
-
-    pub fn abort(self) {
-        self.0.abort();
-    }
-}
-
-impl<'env> ReadTransaction for Reader<'env> {
-    fn get<K: AsRef<[u8]>, D, T>(&self, db: lmdb::Database, k: &K, op: D) -> Result<T, Error>
-        where D: Fn(&[u8]) -> Result<T, Error>
-    {
-        let bytes = self.0.get(db, &k)?;
-        op(bytes)
-    }
-
-    fn open_ro_cursor(&self, db: lmdb::Database) -> Result<RoCursor, Error> {
-        self.0.open_ro_cursor(db).map_err(Error::LMDB)
-    }
-}
-
-impl<'env> Writer<'env> {
-    pub fn new(txn: RwTransaction<'env>) -> Self {
-        Writer(txn)
-    }
-
-    pub fn commit(self) -> Result<(), Error> {
-        self.0.commit().map_err(Error::LMDB)
-    }
-
-    pub fn abort(self) {
-        self.0.abort();
-    }
-
-    pub fn put<K: AsRef<[u8]>, V: AsRef<[u8]>>(&mut self, db: lmdb::Database, key: K, value: V, flags: WriteFlags) -> Result<(), Error> {
-        self.0.put(db, &key, &value, flags)?;
-        Ok(())
-    }
-
-    pub fn delete<K: AsRef<[u8]>>(&mut self, db: lmdb::Database, key: K, value: Option<&[u8]>) -> Result<(), Error> {
-        self.0.del(db, &key, value).map_err(Error::LMDB)
-    }
-
-    pub fn clear(&mut self, db: lmdb::Database) -> Result<(), Error> {
-        self.0.clear_db(db).map_err(Error::LMDB)
-    }
-}
-
-
-#[derive(Copy, Clone)]
-pub struct ItemDatabase {
-    db: lmdb::Database,
-}
-
-impl ItemDatabase {
-    pub fn new(db: lmdb::Database) -> Self {
-        Self { db }
-    }
-
-    pub fn get<R: ReadTransaction, B: Backend>(self, reader: &R, k: B) -> Result<Storables, Error> {
-        reader.get(self.db, &k.into_inner(), |b| bincode::deserialize(b).map_err(Error::Bincode))
-    }
-
-    pub fn put<B: Backend>(self, writer: &mut Writer, k: &B, v: &Storables) -> Result<(), Error> {
-        // TODO: Allocate memory in LMDB, write directly into it.
-        let vec = bincode::serialize(v)?;
-        writer.put(self.db, k.into_inner(), &vec, WriteFlags::empty())
-    }
-
-    pub fn delete<B: Backend>(self, writer: &mut Writer, k: &B, v: Vec<u8>) -> Result<(), Error> {
-        writer.delete(self.db, k.into_inner(), Some(&v))
-    }
-
-    pub fn iter_start<R: ReadTransaction>(self, reader: &R) -> Result<ItemIter, Error> {
-        let mut cursor = reader.open_ro_cursor(self.db)?;
-        let iter = cursor.iter();
-        Ok(ItemIter {
-            iter, 
-            cursor,
-        })
-    }
-
-    pub fn iter_from<R: ReadTransaction, B: Backend>(self, reader: &R, k: B) -> Result<ItemIter, Error> {
-        let mut cursor = reader.open_ro_cursor(self.db)?;
-        let iter = cursor.iter_from(k.into_inner());
-        Ok(ItemIter {
-            iter, 
-            cursor,
-        })
-    }
-}
-
-pub struct ItemIter<'env> {
-    iter: lmdb::Iter<'env>,
-    cursor: RoCursor<'env>,
-}
-
-impl<'env> Iterator for ItemIter<'env> {
-    type Item = Result<(SHA256E, Storables), Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.iter.next() {
-            None => None,
-            Some(Ok((k,v))) => {
-                match bincode::deserialize(v) {
-                    Err(e) => Some(Err(e.into())),
-                    Ok(v) => Some(Ok((SHA256E::construct(k).unwrap(),v)))
-                }
-            }
-            Some(Err(e)) => Some(Err(e.into()))
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct TermOccurance {
-    /// A term occurs in this key
-    pub key: SHA256E,
-    /// The term occurs at the n-th positions.
-    pub occ: Vec<u32>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Term {
-    String(String)
-}
-impl AsRef<[u8]> for Term {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Term::String(s) => s.as_bytes(),
-        }
-    }
-}
-
-#[derive(Copy, Clone)]
-pub struct TermDatabase {
-    db: lmdb::Database,
-}
-
-impl TermDatabase {
-    pub fn new(db: lmdb::Database) -> Self {
-        Self { db }
-    }
-
-    pub fn get<R: ReadTransaction>(self, reader: &R, k: &Term) -> Result<Vec<TermOccurance>, Error> {
-        reader.get(self.db, k, |b| bincode::deserialize(b).map_err(Error::Bincode))
-    }
-
-    pub fn put(self, writer: &mut Writer, k: &Term, v: Vec<TermOccurance>) -> Result<(), Error> {
-        let vec = bincode::serialize(&v)?;
-        writer.put(self.db, k, &vec, WriteFlags::empty())
-    }
-
-    pub fn delete(self, writer: &mut Writer, k: &Term) -> Result<(), Error> {
-        writer.delete(self.db, k, None)
-    }
-
-    pub fn iter_start<R: ReadTransaction>(self, reader: &R) -> Result<IndexIter, Error> {
-        let mut cursor = reader.open_ro_cursor(self.db)?;
-        let iter = cursor.iter_start();
-        Ok(IndexIter {
-            iter,
-            cursor
-        })
-    }
-
-    pub fn iter_from<R: ReadTransaction>(self, reader: &R, k: Term) -> Result<IndexIter, Error> {
-        let mut cursor = reader.open_ro_cursor(self.db)?;
-        let iter = cursor.iter_from(&k);
-        Ok(IndexIter {
-            iter,
-            cursor
-        })
-    }
-}
-
-pub struct IndexIter<'env> {
-    iter: lmdb::Iter<'env>,
-    cursor: RoCursor<'env>,
-}
-
-impl<'env> Iterator for IndexIter<'env> {
-    type Item = Result<(Term, Vec<TermOccurance>), Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.iter.next() {
-            None => None,
-            Some(Ok((k,v))) => {
-                let s: String = String::from_utf8_lossy(k).into();
-                match bincode::deserialize(v) {
-                    Err(e) => Some(Err(e.into())),
-                    Ok(v) => Some(Ok((Term::String(s),v))),
-                }
-            },
-            Some(Err(e)) => Some(Err(e.into())),
-        }
     }
 }
 

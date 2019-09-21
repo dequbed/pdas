@@ -18,6 +18,7 @@ use clap::{App, ArgMatches};
 use log::Level::*;
 
 pub use crate::storage::Storables;
+use crate::storage::Metadata;
 
 pub const SUBCOMMAND: &str = "read";
 
@@ -50,8 +51,8 @@ enum FT {
 pub struct Decoder;
 
 impl Decoder {
-    pub fn decode(files: &[PathBuf]) -> Vec<Result<Storables, Error>> {
-        let mut out: Vec<Result<Storables, Error>> = Vec::with_capacity(files.len());
+    pub fn decode(files: &[PathBuf]) -> Vec<Result<Metadata, Error>> {
+        let mut out: Vec<Result<Metadata, Error>> = Vec::with_capacity(files.len());
         let mut map: HashMap<FT, Vec<&Path>> = HashMap::new();
 
         for f in files {
@@ -132,5 +133,15 @@ impl Decoder {
         }
 
         out
+    }
+}
+
+#[derive(Debug)]
+pub enum DecodeError {
+    Metaflac(metaflac::Error)
+}
+impl From<metaflac::Error> for DecodeError {
+    fn from(e: metaflac::Error) -> Self {
+        Error::Metaflac(e)
     }
 }

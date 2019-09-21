@@ -152,13 +152,17 @@ pub struct Metadata<'e> {
     /// it may contain several words.
     /// It should not contain redundant information, e.g. name the author when the 'author' field
     /// is already set.
-    title: &'e str,
+    pub title: &'e str,
 
     /// The lifeform or intelligent computer program that created this object.
-    author: &'e str,
+    pub author: &'e str,
 
     /// The Filename is relatively often used so we save it as well
-    filename: &'e str,
+    pub filename: &'e str,
+
+
+    /// the size in bytes of the object this data belongs to
+    pub filesize: usize,
 
     metamap: HashMap<Metakey, &'e [u8]>,
 }
@@ -166,9 +170,9 @@ pub struct Metadata<'e> {
 use crate::error::Error;
 
 impl<'e> Metadata<'e> {
-    pub fn new(title: &'e str, author: &'e str, filename: &'e str, metamap: HashMap<Metakey, &'e [u8]>) -> Self {
+    pub fn new(title: &'e str, author: &'e str, filename: &'e str, filesize: usize, metamap: HashMap<Metakey, &'e [u8]>) -> Self {
         Self {
-            title, author, filename, metamap
+            title, author, filename, filesize, metamap
         }
     }
 
@@ -203,9 +207,10 @@ mod tests {
         let author = "testauthor";
         let filename = "testfilename";
         let subject = "testsubject";
+        let filesize = 361567;
         let mut metamap = HashMap::new();
         metamap.insert(Metakey::Subject, subject.as_bytes());
-        let m = Metadata::new(title, author, filename, metamap);
+        let m = Metadata::new(title, author, filename, filesize, metamap);
         println!("{:?}", m);
 
         let l = m.encoded_size().unwrap() as usize;
