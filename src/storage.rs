@@ -217,7 +217,7 @@ mod tests {
         let filesize = 361567;
         let mut metamap = HashMap::new();
         metamap.insert(Metakey::Subject, subject);
-        let m = MetadataOwned::new(title, author, filename, filesize, metamap);
+        let m = MetadataOwned::new(title, Some(author), filename, Some(filesize), metamap);
         println!("{:?}", m);
 
         let l = m.encoded_size().unwrap() as usize;
@@ -228,13 +228,9 @@ mod tests {
 
         let n = Metadata::decode(&vec[..l]).unwrap();
 
-        let subject = n.get::<Subject>().unwrap();
-
-        let vecstart: *const u8 = vec.as_ptr();
-        println!("The buffer starts at {:p} and is {} bytes long", vecstart, vec.len());
-        println!("&title: {:p}, &author: {:p}, &map.subject: {:p}", n.title, n.author, subject);
-        println!("{:?}", n);
-
-        assert!(false);
+        assert_eq!(n.title, m.title);
+        assert_eq!(n.author.map(|s| s.to_string()), m.author);
+        assert_eq!(n.filename, m.filename);
+        assert_eq!(n.filesize, m.filesize);
     }
 }

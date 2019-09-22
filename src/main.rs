@@ -18,6 +18,10 @@ extern crate serde;
 extern crate tree_magic;
 extern crate toml;
 
+#[cfg(test)]
+#[macro_use]
+extern crate maplit;
+
 use std::path::PathBuf;
 use directories::ProjectDirs;
 use std::fs::File;
@@ -84,10 +88,9 @@ impl Librarian {
         dbmb.set_flags(lmdb::EnvironmentFlags::MAP_ASYNC | lmdb::EnvironmentFlags::WRITE_MAP);
         dbmb.set_map_size(10485760);
         dbmb.set_max_dbs(4);
-        let dbm = database::Manager::from_builder(&config.database.basedir, dbmb).unwrap();
+        let dbm = database::Manager::from_builder(std::path::Path::new("/tmp/d/"), dbmb).unwrap();
 
         Librarian {
-            config,
             dbm,
         }
     }
