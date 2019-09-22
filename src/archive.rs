@@ -8,6 +8,8 @@ use clap::{App, ArgMatches};
 
 use std::collections::HashMap;
 
+use lmdb::DatabaseFlags;
+
 use crate::error::Error;
 use crate::decoders::Decoder;
 use crate::Librarian;
@@ -98,7 +100,7 @@ fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
     }
 
     let db = Metadatabase::new(lib.dbm.create_named("main").unwrap());
-    let dbi = Stringindexdb::new(lib.dbm.create_named("title").unwrap());
+    let dbi = Stringindexdb::open(&lib.dbm, "title").unwrap();
 
     let en_stem = Stemmer::create(Algorithm::English);
 
@@ -121,25 +123,21 @@ fn index<T: Transaction>(db: Stringindexdb, r: &T, w: &mut RwTransaction, s: &St
     let fillwords = wordstems.filter(|s| !is_stopword(s));
     let filtered = fillwords.filter(|s| !s.is_empty());
 
+    let mut set = HashMap::<String, Occurance>::new();
     let mut map = HashMap::<String, Vec<u32>>::new();
+    
+
 
     for (pos, stem) in filtered.enumerate() {
         let t = &stem;
 
-        match db.iter(r, t) {
+        match db.get(r, t) {
             Err(Error::LMDB(lmdb::Error::NotFound)) => {}
-            Ok(iter) => {
-                let mut w = w.begin_nested_txn().unwrap();
-                for o in iter {
-                    match o {
-                        Ok((_, o)) => match bincode::deserialize::<Occurance>(o) {
-                            Ok(ref o) if o.key == key => { db.delete(&mut w, &t, &o).unwrap(); },
-                            Ok(_) => {},
-                            Err(e) => error!("while decoding Occurance: {:?}", e),
-                        }
-                        Err(e) => error!("while reading from db: {:?}", e),
-                    }
-                }
+            Ok(mut o) => {
+                // If there is an entry for us, remove it, if not, don't care.
+                o.0.remove(&key);
+                // We definitely need to later on extend this with our entry, to save it.
+                set.insert(stem.to_string(), o);
             },
             Err(e) => {
                 error!("while reading index: {:?}", e);
@@ -152,8 +150,25 @@ fn index<T: Transaction>(db: Stringindexdb, r: &T, w: &mut RwTransaction, s: &St
             .or_insert(vec![pos as u32]);
     }
 
-    for (term, pos) in map.into_iter() {
-        let o = Occurance { key: key, occurance: pos };
+    println!("{:?}", set);
+    println!("{:?}", map);
+
+    for (term, v) in map.into_iter() {
+        let o: Occurance;
+        match set.remove(&term) {
+            Some(mut oc) => {
+                // Occurance in the set means there are other objects that are listed in this
+                // index, we need to UPDATE and then write
+                oc.0.insert(key, v);
+                o = oc;
+            },
+            None => {
+                // There is no entry for this term in the DB => create onew
+                let mut map = HashMap::new();
+                map.insert(key, v);
+                o = Occurance(map);
+            }
+        }
         db.put(w, &term, &o).unwrap();
     }
 }

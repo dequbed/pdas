@@ -1,6 +1,6 @@
 use clap::{App, ArgMatches};
 
-use lmdb::{Iter, IterDup};
+use lmdb::{Iter, IterDup, DatabaseFlags};
 
 use crate::storage::Metadata;
 
@@ -25,6 +25,8 @@ pub fn clap() -> App<'static, 'static> {
         (@subcommand search =>
             (about: "search for a word")
             (@arg term: * "search term"))
+        (@subcommand create =>
+            (about: "create all db files"))
     )
 }
 
@@ -32,6 +34,9 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
     let db = Metadatabase::new(lib.dbm.create_named("main").unwrap());
 
     match matches.subcommand() {
+        ("create", Some(args)) => {
+            Stringindexdb::create(&lib.dbm, "title").unwrap();
+        }
         ("read", Some(args)) => {
             let r = lib.dbm.read().unwrap();
 
@@ -71,16 +76,16 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
             }
         }
         ("index", _) => {
-            let idb = Stringindexdb::new(lib.dbm.create_named("title").unwrap());
+            let idb = Stringindexdb::open(&lib.dbm, "title").unwrap();
             let r = lib.dbm.read().unwrap();
             let is = idb.iter_start(&r).unwrap();
 
-            if let IterDup::Err(e) = is {
+            if let Iter::Err(e) = is {
                 error!("Iterator errored out, aborting: {:?}", e);
                 return;
             }
 
-            for i in is.flatten() {
+            for i in is {
                 match i {
                     Ok((kref, vref)) => {
                         let r: Result<Occurance, Error> = bincode::deserialize(vref).map_err(Error::Bincode);
@@ -97,10 +102,10 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
         }
         ("search", Some(a)) => {
             let needle = a.value_of("term").unwrap();
-            let idb = Stringindexdb::new(lib.dbm.create_named("title").unwrap());
+            let idb = Stringindexdb::open(&lib.dbm, "title").unwrap();
             let r = lib.dbm.read().unwrap();
 
-            let res = find(db, idb, r, needle);
+            find(db, idb, r, needle);
         }
         _ => {}
     }
@@ -111,11 +116,11 @@ fn find<T: Transaction>(db: Metadatabase, dbi: Stringindexdb, r: T, needle: &str
     let ndl = en_stem.stem(needle);
     let term: String = ndl.into();
 
+    println!("Searching for {}", term);
+
     match dbi.get(&r, &term) {
         Ok(occ) => {
-            if let Ok(r) = db.get(&r, &occ.key) {
-                println!("{:?}", r);
-            }
+            println!("{:?}", occ);
         }
         Err(Error::LMDB(lmdb::Error::NotFound)) => {
             println!("No results");

@@ -2,6 +2,8 @@ use crate::error::{Result, Error};
 use crate::storage::{Metadata, MetadataS};
 use serde::{Serialize, Deserialize};
 use libc::size_t;
+use std::fmt;
+use std::collections::HashMap;
 
 pub use lmdb::{
     Environment,
@@ -42,6 +44,9 @@ impl Manager {
     pub fn create_named(&self, name: &str) -> Result<lmdb::Database> {
         self.env.create_db(Some(name), DatabaseFlags::empty()).map_err(Error::LMDB)
     }
+    pub fn create_named_flags(&self, name: &str, flags: DatabaseFlags) -> Result<lmdb::Database> {
+        self.env.create_db(Some(name), flags).map_err(Error::LMDB)
+    }
 
     pub fn read(&self) -> Result<RoTransaction> {
         self.env.begin_ro_txn().map_err(Error::LMDB)
@@ -53,11 +58,20 @@ impl Manager {
 }
 
 /// Keytype for the Metadatabase
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Hash)]
 pub struct SHA256E([u8; 32]);
 impl AsRef<[u8]> for SHA256E {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+impl fmt::Debug for SHA256E {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SHA256E--")?;
+        for byte in self.0.iter() {
+            write!(f, "{:x}", byte)?;
+        }
+        Ok(())
     }
 }
 impl SHA256E {
@@ -137,21 +151,21 @@ impl Metadatabase {
 
 /// An occurance of a term in a document's field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Occurance {
-    /// The key of the document in which the term occurs
-    pub key: Key,
-    /// The word position where the term occurs in the document. May be multiple if the Term occurs
-    /// several times.
-    pub occurance: Vec<u32>,
-}
+pub struct Occurance(pub HashMap<Key, Vec<u32>>);
 
 #[derive(Copy, Clone)]
 pub struct Stringindexdb {
     db: Database,
 }
 impl Stringindexdb {
-    pub fn new(db: Database) -> Self {
-        Self { db }
+    pub fn open(dbm: &Manager, name: &str) -> Result<Self> {
+        let db = dbm.open_named(name)?;
+        Ok(Self { db })
+    }
+
+    pub fn create(dbm: &Manager, name: &str) -> Result<Self> {
+        let db = dbm.create_named_flags(name, DatabaseFlags::empty())?;
+        Ok(Self { db })
     }
 
     fn get_bytes<'txn, T: Transaction, K: AsRef<[u8]>>(self, txn: &'txn T, key: &K) -> Result<&'txn [u8]> {
@@ -172,14 +186,19 @@ impl Stringindexdb {
         bincode::serialize_into(buf, value).map_err(Error::Bincode)
     }
 
-    pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<IterDup<'txn>> {
+    pub fn iter<'txn, T: Transaction>(self, txn: &'txn T) -> Result<Iter<'txn>> {
         let mut cursor = txn.open_ro_cursor(self.db)?;
-        Ok(cursor.iter_dup_start())
+        Ok(cursor.iter())
     }
 
-    pub fn iter<'txn, T: Transaction>(self, txn: &'txn T, key: &str) -> Result<Iter<'txn>> {
+    pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<Iter<'txn>> {
         let mut cursor = txn.open_ro_cursor(self.db)?;
-        Ok(cursor.iter_dup_of(key))
+        Ok(cursor.iter_start())
+    }
+
+    pub fn iter_from<'txn, T: Transaction>(self, txn: &'txn T, key: &str) -> Result<Iter<'txn>> {
+        let mut cursor = txn.open_ro_cursor(self.db)?;
+        Ok(cursor.iter_from(key))
     }
 
     pub fn delete<'txn>(self, txn: &'txn mut RwTransaction, key: &str, value: &Occurance) -> Result<()> {
