@@ -25,6 +25,7 @@ serde = { version = "1.0", features = ["derive"] }
 stderrlog = "0.4"
 tree_magic = "0.2"
 toml = "0.5"
+git2 = "0.10"
 
 [dev-dependencies]
 maplit = "1.0"

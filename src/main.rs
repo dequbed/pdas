@@ -17,6 +17,7 @@ extern crate rust_stemmers;
 extern crate serde;
 extern crate tree_magic;
 extern crate toml;
+extern crate git2;
 
 #[cfg(test)]
 #[macro_use]
