@@ -40,6 +40,20 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
 
 // Import process
 // 1. Check if the file is already annexed, if so => SKIP
+// 1.1 git-annex calckey
 // 2. Else read metadata, annex the file into the object store
 // 3. Calculate the path, move the link
 // 4. Do 1-3 for all files, then commit & sync
+//
+// Output of git-annex import:
+// When skipping because a file was already annexed:
+// {"command":"import","note":"duplicate; skipping","success":true,"file":"USB Type-C Specification Release 1.1.pdf"}
+//
+// When importing a file:
+// {"command":"import","success":true,"key":"SHA256E-s562633--bf8560a3fe8ff8e87dffa1b0d1caf868fb64862018d2377998ad087dd1631a13.pdf","file":"USB-C_Source_Power_Test_Specification_2018_06_01.pdf"}
+//
+// When failing because called with --duplicate but file was already annexed:
+// {"command":"import","success":false,"file":"USB-C_Source_Power_Test_Specification_2018_06_01.pdf"}
+//
+// When importing with --skip-duplicates defined:
+// {"command":"import","success":true,"key":"SHA256E-s8692742--70e9ef5ae0e8d53933740f5a67326db0178e10f196b324e5ba1cf49956ebb5eb.1.pdf","file":"USB Type-C Specification Release 1.1.pdf"}
