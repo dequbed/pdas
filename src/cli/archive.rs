@@ -37,3 +37,9 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
         println!("Provide either a filelist or a list of files, interactive mode is not yet implemented!");
     }
 }
+
+// Import process
+// 1. Check if the file is already annexed, if so => SKIP
+// 2. Else read metadata, annex the file into the object store
+// 3. Calculate the path, move the link
+// 4. Do 1-3 for all files, then commit & sync
