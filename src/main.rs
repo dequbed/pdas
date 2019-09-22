@@ -22,10 +22,7 @@ extern crate toml;
 #[macro_use]
 extern crate maplit;
 
-use std::path::PathBuf;
-use directories::ProjectDirs;
-use std::fs::File;
-use std::io::Read;
+use std::path::Path;
 
 mod cli;
 mod archive;
@@ -43,7 +40,6 @@ use cli::*;
 
 fn main() {
     let matches = clap_app!(lib =>
-        (@setting SubcommandRequiredElseHelp)
         (version: crate_version!())
         (author: crate_authors!())
         (about: "pdas is a tool to analyze and archive various types files more easily into a git-annex repository")
@@ -80,6 +76,7 @@ fn main() {
 // Main application struct
 pub struct Librarian {
     pub dbm: database::Manager,
+    pub config: config::Config,
 }
 
 impl Librarian {
@@ -90,8 +87,30 @@ impl Librarian {
         dbmb.set_max_dbs(4);
         let dbm = database::Manager::from_builder(std::path::Path::new("/tmp/d/"), dbmb).unwrap();
 
+        let config = match config::read_or_create(args.value_of("CONFIG")) {
+            Ok(c) => c,
+            Err(e) => {
+                error!("failed to read config: {:?}", e);
+                std::process::exit(-1);
+            }
+        };
+
+        if !Path::exists(&config.path) {
+            match std::fs::create_dir_all(&config.path) {
+                Ok(_) => {},
+                Err(e) => {
+                    error!("failed to create data directory: {:?}", e);
+                    std::process::exit(-1);
+                }
+            }
+        } else if Path::is_file(&config.path) {
+            error!("data directory {} is a file", config.path.display());
+            std::process::exit(-1);
+        }
+
         Librarian {
             dbm,
+            config,
         }
     }
 }
