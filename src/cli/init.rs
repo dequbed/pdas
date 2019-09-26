@@ -1,6 +1,7 @@
 use std::env;
 use std::path::Path;
 use std::process::{exit, Command};
+use std::fs;
 
 use clap::{App, ArgMatches};
 use crate::Librarian;
@@ -9,6 +10,8 @@ use git2::{
     Repository,
     Config,
 };
+
+use crate::config;
 
 pub const SUBCOMMAND: &'static str = "setup";
 
@@ -19,7 +22,12 @@ pub fn clap() -> App<'static, 'static> {
 }
 
 pub fn run(lib: Librarian, _args: &ArgMatches) {
-    let dir = &lib.config.path;
+    let dir = &config::repopath(&lib.config);
+
+    if !dir.exists() {
+        info!("Creating git directory {}", dir.display());
+        fs::create_dir_all(dir).unwrap();
+    }
 
     if let Err(e) = env::set_current_dir(dir) {
         error!("failed to change directory: {:?}", e);
@@ -63,7 +71,7 @@ pub fn run(lib: Librarian, _args: &ArgMatches) {
             .arg("present"),
         "configuring preferred content");
     cmdrun(Command::new("git-annex")
-            .arg("untrusted")
+            .arg("untrust")
             .arg("."),
         "untrusting local repository");
 

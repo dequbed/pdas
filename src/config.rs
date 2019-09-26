@@ -72,6 +72,13 @@ pub fn read_or_create(path: Option<&str>) -> Result<Config> {
     toml::from_slice(&buf).map_err(Error::Toml)
 }
 
+pub fn dbpath(cfg: &Config) -> PathBuf {
+    cfg.path.join("db")
+}
+pub fn repopath(cfg: &Config) -> PathBuf {
+    cfg.path.join("repo")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -82,12 +82,6 @@ pub struct Librarian {
 
 impl Librarian {
     pub fn new(args: &clap::ArgMatches) -> Self {
-        let mut dbmb = database::Manager::builder();
-        dbmb.set_flags(lmdb::EnvironmentFlags::MAP_ASYNC | lmdb::EnvironmentFlags::WRITE_MAP);
-        dbmb.set_map_size(10485760);
-        dbmb.set_max_dbs(4);
-        let dbm = database::Manager::from_builder(std::path::Path::new("/tmp/d/"), dbmb).unwrap();
-
         let config = match config::read_or_create(args.value_of("CONFIG")) {
             Ok(c) => c,
             Err(e) => {
@@ -96,18 +90,26 @@ impl Librarian {
             }
         };
 
-        if !Path::exists(&config.path) {
-            match std::fs::create_dir_all(&config.path) {
+        let dbdir = config::dbpath(&config);
+        if !Path::exists(&dbdir) {
+            match std::fs::create_dir_all(&dbdir) {
                 Ok(_) => {},
                 Err(e) => {
-                    error!("failed to create data directory: {:?}", e);
+                    error!("failed to create database directory {}: {:?}", dbdir.display(), e);
                     std::process::exit(-1);
                 }
             }
         } else if Path::is_file(&config.path) {
-            error!("data directory {} is a file", config.path.display());
+            error!("database directory {} is a file", config.path.display());
             std::process::exit(-1);
         }
+
+        let mut dbmb = database::Manager::builder();
+        dbmb.set_flags(lmdb::EnvironmentFlags::MAP_ASYNC | lmdb::EnvironmentFlags::WRITE_MAP);
+        dbmb.set_map_size(10485760);
+        dbmb.set_max_dbs(4);
+        let dbm = database::Manager::from_builder(&dbdir, dbmb).unwrap();
+
 
         Librarian {
             dbm,
