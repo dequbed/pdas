@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::{Result, Error};
 
 use json;
 
@@ -10,9 +10,11 @@ use std::process::{Command, Stdio};
 use std::io::{self, BufReader, BufRead, Write};
 
 use std::thread;
+use std::env;
 
 use crate::Librarian;
 use crate::database::Key;
+use crate::config::{self, Config};
 
 pub const SUBCOMMAND: &'static str = "git";
 
@@ -37,7 +39,7 @@ pub fn run(lib: Librarian, args: &ArgMatches) {
     }
 }
 
-pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(Key, String)>, Error> {
+pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(Key, String)>> {
     let mut child = Command::new("git")
         .args(&["annex", "add", "--json", "--json-error-messages", "--batch"])
         .args(&["+RTS", "-N2"])
@@ -85,4 +87,55 @@ pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(Key, String)>, Error> {
     child.wait()?;
 
     tp.join().unwrap()
+}
+
+pub fn import_needed(config: &Config, paths: &[PathBuf]) -> Result<Vec<(Key, PathBuf)>> {
+    let dir = config::repopath(config);
+    env::set_current_dir(dir)?;
+
+    let cpaths = paths.into_iter()
+        .map(|p| p.canonicalize())
+        .filter_map(|r| r.ok());
+
+    let mut child = Command::new("git-annex")
+        .args(&["import", "--skip-duplicates", "--json", "--json-error-messages"])
+        .args(cpaths)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .spawn().unwrap();
+
+    let stdout = child.stdout.take()
+        .ok_or(io::Error::new(io::ErrorKind::UnexpectedEof, "child stdout was closed"))?;
+
+    let mut out = Vec::with_capacity(paths.len());
+
+    for line in BufReader::new(stdout).lines() {
+        let line = line?;
+        if !line.is_empty() {
+            let j = json::parse(&line)?;
+            out.push(j);
+        }
+    }
+
+    info!("Read all from git-annex");
+
+    let r = out.into_iter().filter_map(|mut j: json::JsonValue| {
+        info!("JSON: {:?}", j);
+        match j.remove("note") {
+            json::JsonValue::String(note) => { 
+                if note.as_str() == "duplicate; skipping" {
+                    return None;
+                }
+            }
+            _ => {}
+        }
+
+        let ks: String = j.remove("key").take_string().unwrap();
+        let k: Key = Key::try_parse(&ks).unwrap();
+        let p: String = j.remove("file").take_string().unwrap();
+        let f = std::path::Path::new(&p).to_path_buf();
+        return Some((k,f));
+    }).collect();
+
+    Ok(r)
 }

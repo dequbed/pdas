@@ -14,10 +14,13 @@ use crate::storage::MetadataOwned;
 pub fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
     let pb: Vec<std::path::PathBuf> = iter.map(PathBuf::from).collect();
 
-    info!("Decoding files");
-    let meta = Decoder::decode(&pb);
+
     info!("Annexing files");
-    let keys = git::annex_add(&pb).unwrap();
+    let paths = git::import_needed(&lib.config, &pb).unwrap();
+
+    info!("Decoding files");
+    let meta = Decoder::decode(pb.into_iter());
+    //let keys = git::annex_add(&pb).unwrap();
     info!("Annexed files");
 
     let mut combined: Vec<(Key, MetadataOwned)> = Vec::new();
@@ -31,9 +34,11 @@ pub fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
             .zip(meta);
         info!("Storing Metadata");
 
-        for (key, file) in keys.iter() {
-            keymap.insert(&file, *key);
-        }
+        /*
+         *for (key, file) in keys.iter() {
+         *    keymap.insert(&file, *key);
+         *}
+         */
         for i in metaf {
             match i {
                 (Some(p), Ok(f)) => {

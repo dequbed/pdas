@@ -33,7 +33,7 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
     if let Some(file) = matches.value_of("file") {
         let fpath = PathBuf::from(file);
         let vfp = vec![fpath];
-        let result = Decoder::decode(&vfp);
+        let result = Decoder::decode(vfp.into_iter());
 
         println!("{:?}", result.get(0));
     }
@@ -51,12 +51,14 @@ enum FT {
 pub struct Decoder;
 
 impl Decoder {
-    pub fn decode(files: &[PathBuf]) -> Vec<Result<MetadataOwned, Error>> {
-        let mut out: Vec<Result<MetadataOwned, Error>> = Vec::with_capacity(files.len());
+    pub fn decode<I: Iterator<Item=PathBuf>>(files: I) -> Vec<Result<MetadataOwned, Error>> {
+        let mut out: Vec<Result<MetadataOwned, Error>> = Vec::new();
         let mut map: HashMap<FT, Vec<&Path>> = HashMap::new();
 
+        let files: Vec<PathBuf> = files.collect();
+
         for f in files {
-            if let Some(mime) = tree_magic::from_filepath(f) {
+            if let Some(mime) = tree_magic::from_filepath(&f) {
 
                 debug!("Inferred mime type of file {} as {}", f.display(), mime);
 
@@ -73,8 +75,8 @@ impl Decoder {
                 }
 
                 match map.entry(ft) {
-                    Entry::Occupied(mut e) => e.get_mut().push(f),
-                    Entry::Vacant(e) => { e.insert(vec![f]); },
+                    Entry::Occupied(mut e) => e.get_mut().push(&f),
+                    Entry::Vacant(e) => { e.insert(vec![&f]); },
                 }
             } else {
                 warn!("No MIME for {}", f.display());
