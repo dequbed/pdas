@@ -1,31 +1,5 @@
-[package]
-name = "pdas"
-version = "0.1.0"
-authors = ["Gregor Reitzenstein <me@dequbed.space>"]
-edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-
-bincode = "1.1"
-chrono = { version = "0.4", features = ["serde"] }
-clap = "*"
-directories = "2.0"
-epub = "1.2"
-id3 = "0.3"
-json = "0.12"
-lazy_static = "1.4"
-libc = "*"
-lmdb-rkv = "0.11"
-log = "0.4"
-metaflac = "0.1"
-rust-stemmers = "1.1"
-serde = { version = "1.0", features = ["derive"] }
-stderrlog = "0.4"
-tree_magic = "0.2"
-toml = "0.5"
-git2 = "0.10"
-
-[dev-dependencies]
-maplit = "1.0"
+[workspace]
+members = [
+    "lib/rarian",
+    "bin/pdas"
+]
