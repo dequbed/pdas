@@ -11,75 +11,12 @@ use rust_stemmers::{Algorithm, Stemmer};
 use crate::database::{Key, Metadatabase, RwTransaction, Transaction, Stringindexdb, SHA256E, Occurance};
 use crate::storage::MetadataOwned;
 
+/// 
 pub fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
-    let pb: Vec<std::path::PathBuf> = iter.map(PathBuf::from).collect();
-
+    let pbi = iter.map(PathBuf::from);
 
     info!("Annexing files");
-    let paths = git::import_needed(&lib.config, &pb).unwrap();
-
-    info!("Decoding files");
-    let meta = Decoder::decode(pb.into_iter());
-    //let keys = git::annex_add(&pb).unwrap();
-    info!("Annexed files");
-
-    let mut combined: Vec<(Key, MetadataOwned)> = Vec::new();
-    let mut keymap = HashMap::<&str, Key>::new();
-
-    if !meta.is_empty() {
-
-        let metaf = pb
-            .iter()
-            .map(|b| b.file_name().and_then(|os| os.to_str()))
-            .zip(meta);
-        info!("Storing Metadata");
-
-        /*
-         *for (key, file) in keys.iter() {
-         *    keymap.insert(&file, *key);
-         *}
-         */
-        for i in metaf {
-            match i {
-                (Some(p), Ok(f)) => {
-                    if let Some(k) = keymap.get(&p) {
-                        combined.push((*k, f));
-                        keymap.remove(&p);
-                    } else {
-                        warn!("file {} does not appear to have been annexed or was annexed twice", p);
-                    }
-                }
-                (_, Err(e)) => {
-                    error!("Failure to decode: {:?}", e);
-                }
-                _ => error!("Failure to decode path"),
-            }
-        }
-    }
-
-    if !keymap.is_empty() {
-        warn!("Some files have been indexed but no metadata got extracted.");
-        if log_enabled!(log::Level::Info) {
-            info!("List of files:");
-            for k in keymap.keys() {
-                info!("    {}", k);
-            }
-        }
-    }
-
-    let db = Metadatabase::new(lib.dbm.create_named("main").unwrap());
-    let dbi = Stringindexdb::open(&lib.dbm, "title").unwrap();
-
-    let en_stem = Stemmer::create(Algorithm::English);
-
-    for (k,v) in combined.into_iter() {
-        let r = lib.dbm.read().unwrap();
-        let mut w = lib.dbm.write().unwrap();
-        index(dbi, &r, &mut w, &en_stem, k, &v);
-        store(db, &mut w, &k, v);
-        w.commit().unwrap();
-    }
-
+    let paths = git::import_needed(&lib.config, pbi);
 }
 
 fn index<T: Transaction>(db: Stringindexdb, r: &T, w: &mut RwTransaction, s: &Stemmer, key: SHA256E, val: &MetadataOwned) {

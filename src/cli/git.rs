@@ -2,7 +2,7 @@ use crate::error::{Result, Error};
 
 use json;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{App, ArgMatches};
 
@@ -89,11 +89,11 @@ pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(Key, String)>> {
     tp.join().unwrap()
 }
 
-pub fn import_needed(config: &Config, paths: &[PathBuf]) -> Result<Vec<(Key, PathBuf)>> {
+pub fn import_needed<I: Iterator<Item=PathBuf>>(config: &Config, paths: I) -> Result<Vec<(Key, PathBuf)>> {
     let dir = config::repopath(config);
     env::set_current_dir(dir)?;
 
-    let cpaths = paths.into_iter()
+    let cpaths = paths
         .map(|p| p.canonicalize())
         .filter_map(|r| r.ok());
 
@@ -107,7 +107,7 @@ pub fn import_needed(config: &Config, paths: &[PathBuf]) -> Result<Vec<(Key, Pat
     let stdout = child.stdout.take()
         .ok_or(io::Error::new(io::ErrorKind::UnexpectedEof, "child stdout was closed"))?;
 
-    let mut out = Vec::with_capacity(paths.len());
+    let mut out = Vec::new();
 
     for line in BufReader::new(stdout).lines() {
         let line = line?;

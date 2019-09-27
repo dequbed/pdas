@@ -52,10 +52,11 @@ pub struct Decoder;
 
 impl Decoder {
     pub fn decode<I: Iterator<Item=PathBuf>>(files: I) -> Vec<Result<MetadataOwned, Error>> {
+        // TODO: Move this entire function over to using streams so we don't have to move an
+        // iterator into n vectors but instead just split a stream into n new ones which can get
+        // consumed by whatever.
         let mut out: Vec<Result<MetadataOwned, Error>> = Vec::new();
-        let mut map: HashMap<FT, Vec<&Path>> = HashMap::new();
-
-        let files: Vec<PathBuf> = files.collect();
+        let mut map: HashMap<FT, Vec<PathBuf>> = HashMap::new();
 
         for f in files {
             if let Some(mime) = tree_magic::from_filepath(&f) {
@@ -75,8 +76,8 @@ impl Decoder {
                 }
 
                 match map.entry(ft) {
-                    Entry::Occupied(mut e) => e.get_mut().push(&f),
-                    Entry::Vacant(e) => { e.insert(vec![&f]); },
+                    Entry::Occupied(mut e) => e.get_mut().push(f),
+                    Entry::Vacant(e) => { e.insert(vec![f]); },
                 }
             } else {
                 warn!("No MIME for {}", f.display());
