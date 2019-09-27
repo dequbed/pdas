@@ -51,8 +51,6 @@ pub fn read_or_create(path: Option<&str>) -> Result<Config> {
 
             let path = dir.join("config.toml");
 
-            println!("dir: {}, path: {}", dir.display(), path.display());
-
             if !Path::exists(&path) {
                 let mut f = File::create(&path)?;
                 let c = Config::default();

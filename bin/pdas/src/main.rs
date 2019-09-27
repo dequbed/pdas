@@ -25,13 +25,15 @@ mod init;
 use std::path::Path;
 
 fn main() {
-    let matches = clap_app!(lib =>
+    let matches = clap_app!(pdas =>
         (version: crate_version!())
         (author: crate_authors!())
         (about: "pdas is a tool to analyze and archive various types files more easily into a git-annex repository")
         (@arg CONFIG: -c --config +takes_value +global "Use the specified config file")
         (@arg verbose: -v --verbose +global ... "Be more verbose")
         (@arg quiet: -q --quiet +global "Be quiet")
+        (subcommand: init::clap())
+        (subcommand: archive::clap())
     ).get_matches();
 
 
@@ -42,9 +44,11 @@ fn main() {
         .init()
         .unwrap();
 
-    let librarian = Librarian::new(&matches);
+    let lib = Librarian::new(&matches);
 
     match matches.subcommand() {
+        (init::SUBCOMMAND, Some(args)) => init::run(lib, args),
+        (archive::SUBCOMMAND, Some(args)) => archive::run(lib, args),
         _ => {}
     }
 }

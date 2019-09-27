@@ -33,7 +33,7 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
     } else if let Some(files) = matches.values_of("files") {
         //decode(lib, files.map(str::to_string))
     } else {
-        println!("Provide either a filelist or a list of files, interactive mode is not yet implemented!");
+        error!("Provide either a filelist or a list of files, interactive mode is not yet implemented!");
     }
 }
 
