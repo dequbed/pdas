@@ -1,43 +1,19 @@
-use crate::error::{Result, Error};
-
+use git2::{Repository, Config};
+use std::io;
+use std::process::Command;
+use std::io::BufReader;
+use std::io::BufRead;
+use std::io::Write;
 use json;
-
-use std::path::{Path, PathBuf};
-
-use clap::{App, ArgMatches};
-
-use std::process::{Command, Stdio};
-use std::io::{self, BufReader, BufRead, Write};
-
-use std::thread;
 use std::env;
+use std::process::Stdio;
+use std::thread;
+use std::process::exit;
+use std::path::{PathBuf, Path};
+use std::fs;
 
-use crate::Librarian;
+use crate::error::Result;
 use crate::database::Key;
-use crate::config::{self, Config};
-
-pub const SUBCOMMAND: &'static str = "git";
-
-pub fn clap() -> App<'static, 'static> {
-    clap_app!( @subcommand git =>
-        (@setting TrailingVarArg)
-        (about: "direct git subsystem")
-        (@arg cmd: ... "command to forward to git")
-    )
-}
-
-pub fn run(lib: Librarian, args: &ArgMatches) {
-    let mut git = Command::new("git");
-
-    if let Some(vargs) = args.values_of_os("cmd") {
-        git.args(vargs);
-    }
-
-    match git.spawn() {
-        Ok(mut child) => { child.wait().expect("git process failed to start"); },
-        Err(e) => { error!("Failed to start `git`: {}", e) },
-    }
-}
 
 pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(Key, String)>> {
     let mut child = Command::new("git")
@@ -89,8 +65,7 @@ pub fn annex_add(list: &[PathBuf]) -> Result<Vec<(Key, String)>> {
     tp.join().unwrap()
 }
 
-pub fn import_needed<I: Iterator<Item=PathBuf>>(config: &Config, paths: I) -> Result<Vec<(Key, PathBuf)>> {
-    let dir = config::repopath(config);
+pub fn import_needed<I: Iterator<Item=PathBuf>>(dir: &Path, paths: I) -> Result<Vec<(Key, PathBuf)>> {
     env::set_current_dir(dir)?;
 
     let cpaths = paths
@@ -138,4 +113,88 @@ pub fn import_needed<I: Iterator<Item=PathBuf>>(config: &Config, paths: I) -> Re
     }).collect();
 
     Ok(r)
+}
+
+pub fn init(dir: &Path, remotes: &[(String, String)]) {
+    if !dir.exists() {
+        info!("Creating git directory {}", dir.display());
+        fs::create_dir_all(dir).unwrap();
+    }
+
+    if let Err(e) = env::set_current_dir(dir) {
+        error!("failed to change directory: {:?}", e);
+        exit(-1);
+    }
+
+    let repo = if !Path::new(".git").exists() {
+        Repository::init(dir)
+    } else {
+        Repository::open(dir)
+    };
+
+    let repo = match repo {
+        Ok(r) => r,
+        Err(e) => {
+            error!("failed to initialize git repository: {}", e);
+            exit(-1);
+        }
+    };
+
+    // TODO give repos a description
+    cmdrun(Command::new("git-annex")
+            .arg("init")
+            // Version 7 is default by now but still
+            .arg("--version=7"),
+        "git-annex init");
+
+    match Config::open(Path::new(".git/config")) {
+        Ok(mut config) => {
+            config.set_bool("annex.thin", true).expect("Failed to set annex.thin in git config");
+        }
+        Err(e) => {
+            error!("Failed to open git config: {}", e);
+            exit(-1);
+        }
+    }
+
+    cmdrun(Command::new("git-annex")
+            .arg("wanted")
+            .arg(".")
+            .arg("present"),
+        "configuring preferred content");
+    cmdrun(Command::new("git-annex")
+            .arg("untrust")
+            .arg("."),
+        "untrusting local repository");
+
+
+    // FIXME: Don't add remotes we already have
+    for (name, remote) in remotes.into_iter() {
+        if repo.find_remote(&name).is_err() {
+            if let Err(e) = repo.remote(&name, &remote) {
+                error!("Failed to add remote {}: {}", &name, e)
+            }
+        }
+    }
+
+    cmdrun(Command::new("git-annex").arg("sync"), "git-annex sync");
+}
+
+fn cmdrun(command: &mut Command, name: &str) {
+    match command.status() {
+        Err(e) => {
+            error!("Failed to {}: {}", name, e);
+            return;
+        },
+        Ok(exit) => {
+            if !exit.success() {
+                if let Some(c) = exit.code() {
+                    error!("{} returned with error code: {}", name, c);
+                } else {
+                    error!("{} was killed by a signal", name);
+                }
+                return;
+            }
+        }
+    }
 }

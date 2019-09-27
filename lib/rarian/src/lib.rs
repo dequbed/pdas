@@ -20,18 +20,30 @@ extern crate metaflac;
 #[cfg(id3)]
 extern crate id3;
 
-#[cfg(test)]
-#[macro_use]
-extern crate maplit;
-
 mod storage;
 mod error;
 mod database;
 mod decoders;
+mod git;
 
 pub use lmdb::{
     EnvironmentFlags,
+    DatabaseFlags,
+    Iter,
 };
 
-pub use database::Manager;
 pub use error::{Result, Error};
+
+pub use database::{
+    DBManager,
+    Key,
+    Metadatabase,
+    Stringindexdb,
+    Occurance,
+    find,
+};
+pub use storage::{
+    Metadata,
+    MetadataOwned,
+    Metakey,
+};

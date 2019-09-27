@@ -17,6 +17,11 @@ extern crate rarian;
 mod config;
 mod error;
 
+mod archive;
+mod db;
+mod git;
+mod init;
+
 use std::path::Path;
 
 fn main() {
@@ -46,7 +51,7 @@ fn main() {
 
  // Main application struct
 pub struct Librarian {
-    pub dbm: rarian::Manager,
+    pub dbm: rarian::DBManager,
     pub config: config::Config,
 }
 
@@ -74,11 +79,11 @@ impl Librarian {
             std::process::exit(-1);
         }
 
-        let mut dbmb = rarian::Manager::builder();
+        let mut dbmb = rarian::DBManager::builder();
         dbmb.set_flags(rarian::EnvironmentFlags::MAP_ASYNC | rarian::EnvironmentFlags::WRITE_MAP);
         dbmb.set_map_size(10485760);
         dbmb.set_max_dbs(4);
-        let dbm = rarian::Manager::from_builder(&dbdir, dbmb).unwrap();
+        let dbm = rarian::DBManager::from_builder(&dbdir, dbmb).unwrap();
 
 
         Librarian {

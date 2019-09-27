@@ -4,6 +4,7 @@ use serde::{Serialize, Deserialize};
 use libc::size_t;
 use std::fmt;
 use std::collections::HashMap;
+use rust_stemmers::{Algorithm, Stemmer};
 
 pub use lmdb::{
     Environment,
@@ -22,17 +23,17 @@ pub use lmdb::{
 
 use std::path::Path;
 
-pub struct Manager {
+pub struct DBManager {
     env: Environment
 }
 
-impl Manager {
+impl DBManager {
     pub fn builder() -> EnvironmentBuilder {
         Environment::new()
     }
 
     pub fn from_builder(path: &Path, env: EnvironmentBuilder) -> Result<Self> {
-        Ok(Self {
+        Ok(DBManager {
             env: env.open(path).map_err(Error::LMDB)?
         })
     }
@@ -152,18 +153,23 @@ impl Metadatabase {
 /// An occurance of a term in a document's field.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Occurance(pub HashMap<Key, Vec<u32>>);
+impl Occurance {
+    pub fn deserialize(buf: &[u8]) -> Result<Occurance> {
+        bincode::deserialize(buf).map_err(Error::Bincode)
+    }
+}
 
 #[derive(Copy, Clone)]
 pub struct Stringindexdb {
     db: Database,
 }
 impl Stringindexdb {
-    pub fn open(dbm: &Manager, name: &str) -> Result<Self> {
+    pub fn open(dbm: &DBManager, name: &str) -> Result<Self> {
         let db = dbm.open_named(name)?;
         Ok(Self { db })
     }
 
-    pub fn create(dbm: &Manager, name: &str) -> Result<Self> {
+    pub fn create(dbm: &DBManager, name: &str) -> Result<Self> {
         let db = dbm.create_named_flags(name, DatabaseFlags::empty())?;
         Ok(Self { db })
     }
@@ -206,3 +212,37 @@ impl Stringindexdb {
         txn.del(self.db, &key, Some(&val)).map_err(Error::LMDB)
     }
 }
+
+
+pub fn find<T: Transaction>(db: Metadatabase, dbi: Stringindexdb, r: T, needle: &str) {
+    let en_stem = Stemmer::create(Algorithm::English);
+    let ndl = en_stem.stem(needle);
+    let term: String = ndl.into();
+
+    println!("Searching for {}", term);
+
+    match dbi.get(&r, &term) {
+        Ok(occ) => {
+            println!("{:?}", occ);
+        }
+        Err(Error::LMDB(lmdb::Error::NotFound)) => {
+            println!("No results");
+        }
+        Err(e) => {
+            error!("while querying index db: {:?}", e);
+        }
+    }
+}
+
+// More sensible: What defines a Database in our context?
+// 1. What Key-Type they use (MetaDB: SHA256E, TermDB: String)
+// 2. What Value-Type they use (MetaDB: MetaValue, TermDB: TermOccurance)
+// 3. Are they duplicate key types? (i.e. What kind of iterator do they use)
+// 4. In general, what is their configuration like?
+//
+// A database uses bytestrings as Keys and Values. In Rust we can easily build that as DB<K:
+// AsRef<[u8]>, V: AsRef<[u8]>>, i.e. generic over any type K and V that can both be dereferenced
+// into bytestrings.
+// A specific database (e.g. Metadata storage) is a composed struct that contains a version of that
+// generic DB with both K and (maybe?) V bound to a specifc type. They should also define a custom
+// wrapper around new() that enables them to configure the flags the DB is created with.

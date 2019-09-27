@@ -1,15 +1,17 @@
 use clap::{App, ArgMatches};
 
-use lmdb::{Iter, IterDup, DatabaseFlags};
-
-use crate::storage::Metadata;
-
-use rust_stemmers::{Algorithm, Stemmer};
+use rarian::{Iter, DatabaseFlags};
 
 use crate::Librarian;
 use crate::error::Error;
 
-use crate::database::{Key, Metadatabase, Stringindexdb, Transaction, Occurance};
+use rarian::{
+    Metadatabase,
+    Stringindexdb,
+    Metadata,
+    Key,
+    Occurance,
+};
 
 pub fn clap() -> App<'static, 'static> {
     clap_app!( @subcommand db =>
@@ -88,7 +90,7 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
             for i in is {
                 match i {
                     Ok((kref, vref)) => {
-                        let r: Result<Occurance, Error> = bincode::deserialize(vref).map_err(Error::Bincode);
+                        let r: Result<Occurance, Error> = Occurance::deserialize(vref).map_err(Error::Rarian);
                         match r {
                             Ok(o) => println!("{:?}: {:?}", kref, o),
                             Err(e) => error!("Failed to decode index value: {:?}", e),
@@ -105,41 +107,8 @@ pub fn run(lib: Librarian, matches: &ArgMatches) {
             let idb = Stringindexdb::open(&lib.dbm, "title").unwrap();
             let r = lib.dbm.read().unwrap();
 
-            find(db, idb, r, needle);
+            rarian::find(db, idb, r, needle);
         }
         _ => {}
     }
 }
-
-fn find<T: Transaction>(db: Metadatabase, dbi: Stringindexdb, r: T, needle: &str) {
-    let en_stem = Stemmer::create(Algorithm::English);
-    let ndl = en_stem.stem(needle);
-    let term: String = ndl.into();
-
-    println!("Searching for {}", term);
-
-    match dbi.get(&r, &term) {
-        Ok(occ) => {
-            println!("{:?}", occ);
-        }
-        Err(Error::LMDB(lmdb::Error::NotFound)) => {
-            println!("No results");
-        }
-        Err(e) => {
-            error!("while querying index db: {:?}", e);
-        }
-    }
-}
-
-// More sensible: What defines a Database in our context?
-// 1. What Key-Type they use (MetaDB: SHA256E, TermDB: String)
-// 2. What Value-Type they use (MetaDB: MetaValue, TermDB: TermOccurance)
-// 3. Are they duplicate key types? (i.e. What kind of iterator do they use)
-// 4. In general, what is their configuration like?
-//
-// A database uses bytestrings as Keys and Values. In Rust we can easily build that as DB<K:
-// AsRef<[u8]>, V: AsRef<[u8]>>, i.e. generic over any type K and V that can both be dereferenced
-// into bytestrings.
-// A specific database (e.g. Metadata storage) is a composed struct that contains a version of that
-// generic DB with both K and (maybe?) V bound to a specifc type. They should also define a custom
-// wrapper around new() that enables them to configure the flags the DB is created with.
