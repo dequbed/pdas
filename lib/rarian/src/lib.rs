@@ -47,3 +47,7 @@ pub use storage::{
     MetadataOwned,
     Metakey,
 };
+
+pub use git::{
+    init,
+};
