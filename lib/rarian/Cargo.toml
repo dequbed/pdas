@@ -20,23 +20,6 @@ tree_magic = "0.2"
 git2 = "0.10"
 futures-preview = "0.3.0-alpha.19"
 rand = "0.7"
-
-[dependencies.metaflac]
-version = "0.1"
-#optional = true
-
-[dependencies.id3]
-version = "0.3"
-#optional = true
-
-[dependencies.epub]
-version = "1.2"
-#optional = true
-
-#[features]
-#default = [ "flac", "pdf", "ebook" ]
-
-#flac = ["metaflac"]
-#mpeg = ["id3"]
-#pdf = []
-#ebook = ["epub"]
+metaflac = "0.1"
+id3 = "0.3"
+epub = "1.2"
