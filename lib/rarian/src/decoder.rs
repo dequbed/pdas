@@ -18,16 +18,30 @@ enum FT {
     Unrecognized,
 }
 
-pub struct Decoder{
+// A ft-decoder will practically always do disk-io and may also do expensive stuff like calling to
+// external programms, looking up information over network connections, etc. For that reason a
+// decoder is a `futures::Stream`, may take arbitarily long to return an element and may reorder
+// elements. The Decoder-Manager here should be prepared to handle all of those cases, e.g. by
+// sending both the Key and Path to a decoder so that return-values don't need to be ordered in any
+// way.
+
+
+pub struct DecoderManager {
     /*
      *pdf: PdfDecoder,
      *epub: EpubDecoder,
      *flac: FlacDecoder,
      */
+    mpeg_tx: mpsc::Sender<PathBuf>,
     mpeg: MpegDecoder<mpsc::Receiver<PathBuf>>,
 }
 
-impl Decoder {
+impl DecoderManager {
+    pub fn new() -> Self {
+        let (mpeg_tx, mpeg_rx) = mpsc::channel(16);
+        let mpeg = MpegDecoder::new(mpeg_rx);
+        DecoderManager { mpeg_tx, mpeg }
+    }
 /*
  *        // TODO: Move this entire function over to using streams so we don't have to move an
  *        // iterator into n vectors but instead just split a stream into n new ones which can get
