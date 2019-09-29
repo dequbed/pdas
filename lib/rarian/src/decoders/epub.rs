@@ -1,3 +1,11 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::fs::File;
+use crate::storage::{MetadataOwned, Metakey};
+use crate::error::Result;
+use crate::decoders::DecodeError;
+use epub::doc::EpubDoc;
+
 pub struct EpubDecoder<I> {
     paths: I,
 }

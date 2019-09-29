@@ -1,22 +1,22 @@
-use std::path::PathBuf;
-
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 use crate::error::Error;
-use crate::decoders::Decoder;
-use crate::Librarian;
 use crate::git;
 use rust_stemmers::{Algorithm, Stemmer};
 
 use crate::database::{Key, Metadatabase, RwTransaction, Transaction, Stringindexdb, SHA256E, Occurance};
 use crate::storage::MetadataOwned;
 
-/// 
-pub fn decode<I: Iterator<Item=String>>(lib: Librarian, iter: I) {
-    let pbi = iter.map(PathBuf::from);
+/// Imports files into the annex and moves them where they belong according to Metadata
+pub fn import<'a, I: Iterator<Item=&'a Path>>(repodir: &Path, iter: I) {
+    let randomdirname = format!("import-{:x}", rand::random::<u32>());
+    let randomdir = Path::new(&randomdirname);
+    let importdir = repodir.join(randomdir);
 
-    info!("Annexing files");
-    let paths = git::import_needed(&lib.config, pbi);
+    if let Ok(v) = git::import(&importdir, iter) {
+        let (k,p): (Vec<Key>, Vec<PathBuf>) = v.into_iter().unzip();
+    }
 }
 
 fn index<T: Transaction>(db: Stringindexdb, r: &T, w: &mut RwTransaction, s: &Stemmer, key: SHA256E, val: &MetadataOwned) {

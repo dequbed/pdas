@@ -1,3 +1,12 @@
+use std::collections::HashMap;
+use std::ffi::OsStr;
+use std::path::PathBuf;
+use metaflac::Tag as FlacTag;
+use std::fs::File;
+use crate::storage::{MetadataOwned, Metakey};
+use crate::error::Result;
+use crate::decoders::DecodeError;
+
 pub struct FlacDecoder<I> {
     paths: I,
 }
@@ -66,3 +75,10 @@ impl<I> FlacDecoder<I> {
         Self { paths }
     }
 }
+
+impl From<metaflac::Error> for DecodeError {
+    fn from(e: metaflac::Error) -> Self {
+        DecodeError::Metaflac(e)
+    }
+}
+

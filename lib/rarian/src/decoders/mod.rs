@@ -1,37 +1,18 @@
-#[cfg(flac)]
 mod flac;
+pub use flac::FlacDecoder;
 
-#[cfg(id3)]
-mod id3;
+mod mpeg;
+pub use mpeg::MpegDecoder;
 
-#[cfg(epub)]
 mod epub;
+pub use self::epub::EpubDecoder;
 
-#[cfg(pdf)]
 mod pdf;
+pub use pdf::PdfDecoder;
 
 #[derive(Debug)]
 pub enum DecodeError {
-    #[cfg(flac)]
     Metaflac(metaflac::Error),
-
-    #[cfg(id3)]
-    Id3(id3::Error),
-
-    #[cfg(epub)]
+    Id3(::id3::Error),
     Epub,
-}
-
-#[cfg(flac)]
-impl From<metaflac::Error> for DecodeError {
-    fn from(e: metaflac::Error) -> Self {
-        DecodeError::Metaflac(e)
-    }
-}
-
-#[cfg(id3)]
-impl From<id3::Error> for DecodeError {
-    fn from(e: id3::Error) -> Self {
-        DecodeError::Id3(e)
-    }
 }

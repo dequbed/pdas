@@ -2,25 +2,6 @@ use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Storables {
-    Text(Book),
-    Audio(Song),
-}
-
-impl Storables {
-    pub fn title(&self) -> String {
-        match self {
-            Storables::Text(b) => match b.title { 
-                Some(ref b) => b.clone(),
-                None => b.filename.clone(),
-            },
-            Storables::Audio(s) => s.title.clone(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Metakey {
     Subject,

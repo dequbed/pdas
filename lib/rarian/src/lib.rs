@@ -1,30 +1,16 @@
+#![allow(unused_imports)]
 #[macro_use]
 extern crate log;
-
 #[macro_use]
 extern crate lazy_static;
-
-extern crate bincode;
-extern crate chrono;
-extern crate git2;
-extern crate libc;
-extern crate lmdb;
-extern crate rust_stemmers;
-extern crate serde;
-extern crate tree_magic;
-
-#[cfg(epub)]
-extern crate epub;
-#[cfg(flac)]
-extern crate metaflac;
-#[cfg(id3)]
-extern crate id3;
 
 mod storage;
 mod error;
 mod database;
 mod decoders;
+mod decoder;
 mod git;
+mod archive;
 
 pub use lmdb::{
     EnvironmentFlags,

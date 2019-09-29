@@ -1,3 +1,10 @@
+use std::collections::HashMap;
+use std::path::PathBuf;
+use crate::storage::{MetadataOwned, Metakey};
+use crate::error::Result;
+use std::process::Command;
+use std::collections::VecDeque;
+
 pub struct PdfDecoder<I>{
     paths: I,
     vals: VecDeque<MetadataOwned>,
