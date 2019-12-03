@@ -18,6 +18,11 @@ enum FT {
     Unrecognized,
 }
 
+// Three types of decoders
+// - rsdecoder : Built-in Rust
+// - sodecoder : Loaded in .so
+// - shdecoder : call a shell process that returns data in a structured format
+
 // A ft-decoder will practically always do disk-io and may also do expensive stuff like calling to
 // external programms, looking up information over network connections, etc. For that reason a
 // decoder is a `futures::Stream`, may take arbitarily long to return an element and may reorder

@@ -1,5 +1,5 @@
 use crate::error::{Result, Error};
-use crate::storage::{Metadata, MetadataS};
+use crate::storage::{Metadata, MetadataS, MetadataOwned};
 use serde::{Serialize, Deserialize};
 use libc::size_t;
 use std::fmt;
@@ -76,6 +76,10 @@ impl fmt::Debug for SHA256E {
     }
 }
 impl SHA256E {
+    pub fn new(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
     pub fn try_parse(s: &str) -> Option<Self> {
         let mut si = s.split("--");
         let [a,b]: [&str; 2] = [si.next().unwrap(), si.next().unwrap()];
@@ -100,9 +104,9 @@ impl SHA256E {
 
 fn val(c: u8) -> u8 {
     match c {
-        b'A'...b'F' => c - b'A' + 10,
-        b'a'...b'f' => c - b'a' + 10,
-        b'0'...b'9' => c - b'0',
+        b'A'..=b'F' => c - b'A' + 10,
+        b'a'..=b'f' => c - b'a' + 10,
+        b'0'..=b'9' => c - b'0',
         _ => 0
     }
 }
@@ -148,6 +152,34 @@ impl Metadatabase {
         let mut cursor = txn.open_ro_cursor(self.db)?;
         Ok(cursor.iter_start())
     }
+}
+
+pub fn db_to_map<T: Transaction>(db: &Metadatabase, txn: &T) -> Result<HashMap<Key, MetadataOwned>> {
+    let c = db.iter_start(txn)?;
+
+    if let Iter::Err(e) = c {
+        error!("Iterator errored out, aborting: {:?}", e);
+        return Err(Error::LMDB(e));
+    }
+
+    let mut map = HashMap::new();
+
+    for i in c {
+        match i {
+            Ok((kref, vref)) => {
+                let mut b = [0u8; 32];
+                b.copy_from_slice(kref);
+                let v = MetadataOwned::decode(vref)?;
+                let k = Key::new(b);
+                map.insert(k, v);
+            },
+            Err(e) => {
+                return Err(Error::LMDB(e));
+            }
+        }
+    }
+
+    Ok(map)
 }
 
 /// An occurance of a term in a document's field.

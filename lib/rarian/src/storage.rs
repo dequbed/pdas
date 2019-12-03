@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use crate::database::Key;
 
 use serde::{Serialize, Deserialize};
 
@@ -157,6 +158,53 @@ impl<'e, S, B> MetadataS<S, B>
 
 pub type Metadata<'e> = MetadataS<&'e str, &'e [u8]>;
 pub type MetadataOwned = MetadataS<String, Box<[u8]>>;
+
+pub fn merge(mut a: HashMap<Key, MetadataOwned>, mut b: HashMap<Key, MetadataOwned>) 
+    -> Result<
+        HashMap<Key, MetadataOwned>, 
+        (HashMap<Key, MetadataOwned>, HashMap<Key, MetadataOwned>, HashMap<Key, MetadataOwned>)
+    > {
+    use std::collections::hash_map::Entry;
+
+    let mut a2 = HashMap::new();
+    let mut b2 = HashMap::new();
+
+    let mut clean = true;
+
+    for (k,v) in a.drain() {
+        match b.entry(k) {
+            Entry::Vacant(e) => {
+                e.insert(v);
+            },
+            Entry::Occupied(e) => {
+                clean = false;
+                let (_,vb) = e.remove_entry();
+
+                match merge_single(v,vb) {
+                    Ok(new) => {
+                        b.insert(k,new);
+                    },
+                    Err((va,vb)) => {
+                        a2.insert(k, va);
+                        b2.insert(k, vb);
+                    }
+                }
+            }
+        }
+    }
+
+    if clean {
+        Ok(b)
+    } else {
+        Err((b, a2, b2))
+    }
+}
+
+pub fn merge_single(a: MetadataOwned, b: MetadataOwned) 
+    -> Result<MetadataOwned, (MetadataOwned, MetadataOwned)> 
+{
+    return Err((a,b));
+}
 
 #[cfg(test)]
 mod tests {
