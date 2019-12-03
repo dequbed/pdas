@@ -6,7 +6,6 @@ edition = "2018"
 readme = "../../README.md"
 
 [dependencies]
-
 bincode = "1.1"
 chrono = { version = "0.4", features = ["serde"] }
 json = "0.12"
@@ -23,3 +22,5 @@ rand = "0.7"
 metaflac = "0.1"
 id3 = "0.3"
 epub = "1.2"
+
+uuid = "0.8"

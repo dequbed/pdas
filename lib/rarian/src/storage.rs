@@ -159,6 +159,13 @@ impl<'e, S, B> MetadataS<S, B>
 pub type Metadata<'e> = MetadataS<&'e str, &'e [u8]>;
 pub type MetadataOwned = MetadataS<String, Box<[u8]>>;
 
+pub fn metadata_combine<'e, B>(a: &'e HashMap<Metakey, B>, b: &'e HashMap<Metakey, B>)
+    -> Option<HashMap<Metakey, B>>
+    where B: Serialize + Deserialize<'e> + AsRef<[u8]> + Clone
+{
+    Some(a.clone())
+}
+
 pub fn merge(mut a: HashMap<Key, MetadataOwned>, mut b: HashMap<Key, MetadataOwned>) 
     -> Result<
         HashMap<Key, MetadataOwned>, 
