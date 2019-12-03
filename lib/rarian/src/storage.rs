@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Metakey {
+    Title,
     Subject,
     Description,
     Date,
@@ -67,6 +68,12 @@ impl<'de> Metavalue<'de> for &'de str {
     fn decode(bytes: &'de [u8]) -> Self {
         unsafe { std::str::from_utf8_unchecked(bytes) }
     }
+}
+
+pub struct Title;
+impl<'de> Meta<'de> for Title {
+    type Value = &'de str;
+    const KEY: Metakey = Metakey::Title;
 }
 
 pub struct Subject;

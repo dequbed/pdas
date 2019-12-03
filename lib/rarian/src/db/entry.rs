@@ -90,7 +90,7 @@ impl<'e, B> EntryT<B>
         self.metadata.get(&T::KEY).map(|r: &B| T::decode(r.as_ref()))
     }
 
-    fn metadata(&self) -> &HashMap<Metakey, B> {
+    pub fn metadata(&self) -> &HashMap<Metakey, B> {
         &self.metadata
     }
 }
@@ -114,7 +114,7 @@ pub fn combine<'e, B>(a: &'e mut EntryT<B>, b: &'e mut EntryT<B>) -> Option<Entr
 }
 
 #[derive(Copy, Clone)]
-struct EntryDB {
+pub struct EntryDB {
     db: Database,
 }
 
@@ -131,16 +131,15 @@ impl EntryDB {
         txn.reserve(self.db, key, len as size_t, flags).map_err(Error::LMDB)
     }
 
-    pub fn get<'txn, T: Transaction>(self, txn: &'txn T, key: &Uuid) -> Result<Entry<'txn>> {
-        self.get_bytes(txn, key.as_bytes()).and_then(Entry::decode)
+    pub fn get<'txn, T: Transaction>(self, txn: &'txn T, key: &UUID) -> Result<Entry<'txn>> {
+        self.get_bytes(txn, &key.as_bytes()).and_then(Entry::decode)
     }
 
-    pub fn put<'txn, V, B>(self, txn: &'txn mut RwTransaction, key: &Uuid, e: EntryT<B>) -> Result<()>
-        where V: AsRef<[FileKey]> + Serialize + Deserialize<'txn>,
-              B: AsRef<[u8]> + Serialize + Deserialize<'txn>
+    pub fn put<'txn, B>(self, txn: &'txn mut RwTransaction, key: &UUID, e: EntryT<B>) -> Result<()>
+        where B: AsRef<[u8]> + Serialize + Deserialize<'txn>
     {
         let len = e.encoded_size()? as usize;
-        let buf = self.reserve_bytes(txn, key.as_bytes(), len, WriteFlags::empty())?;
+        let buf = self.reserve_bytes(txn, &key.as_bytes(), len, WriteFlags::empty())?;
         e.encode_into(buf)
     }
 

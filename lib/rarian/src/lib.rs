@@ -11,7 +11,9 @@ mod decoders;
 mod decoder;
 mod git;
 mod archive;
-mod db;
+
+pub mod db;
+pub mod index;
 
 pub use lmdb::{
     EnvironmentFlags,

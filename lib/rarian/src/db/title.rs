@@ -19,7 +19,7 @@ use crate::error::{Result, Error};
 use crate::db::entry::UUID;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-struct Matches(HashSet<UUID>);
+pub struct Matches(HashSet<UUID>);
 
 impl Matches {
     pub fn new(set: HashSet<UUID>) -> Self {
@@ -49,7 +49,7 @@ impl Matches {
 }
 
 #[derive(Copy, Clone)]
-struct TitleDB {
+pub struct TitleDB {
     db: Database,
 }
 
