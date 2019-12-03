@@ -33,6 +33,21 @@ impl FileKey {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub struct UUID(u128);
+
+impl UUID {
+    pub fn new(uuid: Uuid) -> Self{
+        Self (uuid.as_u128())
+    }
+    pub fn as_uuid(self) -> Uuid {
+        Uuid::from_u128(self.0)
+    }
+    pub fn as_bytes(self) -> [u8; 16] {
+        self.0.to_le_bytes()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntryT<B> {
     filekeys: HashSet<FileKey>,
@@ -92,12 +107,13 @@ pub fn combine<'e, B>(a: &'e mut EntryT<B>, b: &'e mut EntryT<B>) -> Option<Entr
              .union(b.keys())
              .map(|x| *x)
             );
-        Some(EntryT::newv(allkeys, a.metadata().clone()))
+        Some(EntryT::newv(allkeys, m))
     } else {
         None
     }
 }
 
+#[derive(Copy, Clone)]
 struct EntryDB {
     db: Database,
 }
