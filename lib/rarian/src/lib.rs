@@ -7,13 +7,10 @@ extern crate lazy_static;
 mod storage;
 mod error;
 mod database;
-mod decoders;
-mod decoder;
-mod git;
-mod archive;
 
 pub mod db;
 pub mod index;
+pub mod decode;
 
 pub use lmdb::{
     EnvironmentFlags,
@@ -26,17 +23,9 @@ pub use error::{Result, Error};
 pub use database::{
     DBManager,
     Key,
-    Metadatabase,
-    Stringindexdb,
-    Occurance,
-    find,
 };
 pub use storage::{
     Metadata,
     MetadataOwned,
     Metakey,
-};
-
-pub use git::{
-    init,
 };

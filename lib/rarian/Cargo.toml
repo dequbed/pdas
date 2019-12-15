@@ -17,10 +17,15 @@ rust-stemmers = "1.1"
 serde = { version = "1.0", features = ["derive"] }
 tree_magic = "0.2"
 git2 = "0.10"
-futures-preview = "0.3.0-alpha.19"
+futures = "0.3"
 rand = "0.7"
 metaflac = "0.1"
 id3 = "0.3"
 epub = "1.2"
 
-uuid = "0.8"
+uuid = { version = "0.8", features = ["v4"] }
+
+git-annex = { path = "../annex" }
+
+[dev-dependencies]
+tempfile = "3.1"

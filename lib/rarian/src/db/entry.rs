@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use std::iter::FromIterator;
 
 use uuid::Uuid;
+
 use libc::size_t;
 use lmdb::{
     Database,
@@ -39,6 +40,10 @@ pub struct UUID(u128);
 impl UUID {
     pub fn new(uuid: Uuid) -> Self{
         Self (uuid.as_u128())
+    }
+    pub fn generate() -> Self {
+        let u = Uuid::new_v4();
+        Self::new(u)
     }
     pub fn as_uuid(self) -> Uuid {
         Uuid::from_u128(self.0)

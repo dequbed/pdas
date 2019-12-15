@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::error::Error;
-use crate::git;
+use git_annex;
 use rust_stemmers::{Algorithm, Stemmer};
 
 use crate::database::{Key, Metadatabase, RwTransaction, Transaction, Stringindexdb, SHA256E, Occurance};
@@ -14,7 +14,7 @@ pub fn import<'a, I: Iterator<Item=&'a Path>>(repodir: &Path, iter: I) {
     let randomdir = Path::new(&randomdirname);
     let importdir = repodir.join(randomdir);
 
-    if let Ok(v) = git::import(&importdir, iter) {
+    if let Ok(v) = git_annex::import(&importdir, iter) {
         let (k,p): (Vec<Key>, Vec<PathBuf>) = v.into_iter().unzip();
     }
 }

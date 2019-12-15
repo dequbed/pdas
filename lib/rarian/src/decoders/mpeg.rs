@@ -10,7 +10,7 @@ use id3::Tag as Id3Tag;
 use core::pin::Pin;
 use futures::task;
 use futures::stream::Stream;
-use futures::Poll;
+use futures::task::Poll;
 
 pub struct MpegDecoder<S> {
     paths: S

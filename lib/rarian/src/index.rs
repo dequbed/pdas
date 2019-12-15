@@ -32,7 +32,27 @@ impl Indexer {
         }
     }
 
-    pub fn index<'txn, B>(&mut self, s: &Stemmer, txn: &'txn mut RwTransaction, uuid: UUID, entry: EntryT<B>) -> Result<()>
+    pub fn index<'txn, B>
+        ( &mut self
+        , txn: &'txn mut RwTransaction
+        , uuid: UUID
+        , entry: EntryT<B>
+        )
+        -> Result<()>
+        where B: Serialize + Deserialize<'txn> + AsRef<[u8]>
+    {
+        let st = Stemmer::create(Algorithm::English);
+        self.index_st(&st, txn, uuid, entry)
+    }
+
+    pub fn index_st<'txn, B>
+        ( &mut self
+        , s: &Stemmer
+        , txn: &'txn mut RwTransaction
+        , uuid: UUID
+        , entry: EntryT<B>
+        )
+        -> Result<()>
         where B: Serialize + Deserialize<'txn> + AsRef<[u8]>
     {
         for (k,v) in entry.metadata().iter() {
