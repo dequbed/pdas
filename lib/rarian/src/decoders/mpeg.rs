@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use std::ffi::OsStr;
-use std::path::PathBuf;
 use std::fs::File;
-use crate::storage::{MetadataOwned, Metakey};
+use crate::storage::Metakey;
 use crate::error::{Result, Error};
 use crate::decoders::DecodeError;
 use id3::Tag as Id3Tag;
@@ -12,68 +10,54 @@ use futures::task;
 use futures::stream::Stream;
 use futures::task::Poll;
 
-pub struct MpegDecoder<S> {
-    paths: S
-}
-impl<K, S: Stream<Item=(K,PathBuf)> + Unpin> Stream for MpegDecoder<S> {
-    type Item = (K, Result<MetadataOwned>);
+pub struct MpegDecoder;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut task::Context) -> Poll<Option<Self::Item>> {
-        if let Some((k, path)) = futures::ready!( Stream::poll_next(Pin::new(&mut self.paths), cx) ) {
-            let f = match File::open(&path) {
-                Ok(f) => f,
-                Err(e) => return Poll::Ready(Some((k, Err(e.into())))),
-            };
-
-            let a = match Id3Tag::read_from(&f) {
-                Ok(tag) => {
-                    let filename = path.file_name().and_then(OsStr::to_str).map(str::to_string).unwrap();
-                    let title = tag.title().unwrap_or_else(|| &filename).to_string();
-                    let author = tag.artist().map(|s| s.to_string());
-                    let filesize = f.metadata().ok().map(|m| m.len() as usize);
-
-                    let mut metamap = HashMap::new();
-
-                    if let Some(album) = tag.album() { 
-                        let albuf = album.to_string().into_boxed_str().into_boxed_bytes();
-                        metamap.insert(Metakey::Album, albuf);
-                    }
-                    if let Some(genre) = tag.genre() {
-                        let genbuf = genre.to_string().into_boxed_str().into_boxed_bytes();
-                        metamap.insert(Metakey::Genre, genbuf);
-                    }
-                    if let Some(track) = tag.track() {
-                        let buf = Box::new(track.to_le_bytes());
-                        metamap.insert(Metakey::Track, buf);
-                    }
-                    if let Some(ttrack) = tag.total_tracks() {
-                        let buf = Box::new(ttrack.to_le_bytes());
-                        metamap.insert(Metakey::Totaltracks, buf);
-                    }
-                    if let Some(artist) = tag.album_artist() { 
-                        let albuf = artist.to_string().into_boxed_str().into_boxed_bytes();
-                        metamap.insert(Metakey::Albumartist, albuf);
-                    }
-
-                    let m = MetadataOwned::new(title, author, filename, filesize, metamap);
-
-                    (k, Ok(m))
-                }
-                Err(e) => {
-                    let e: DecodeError = e.into();
-                    (k, Err(e.into()))
-                }
-            };
-
-            Poll::Ready(Some(a))
-        } else {
-            Poll::Ready(None)
-        }
+impl MpegDecoder {
+    pub fn new() -> Self {
+        Self
     }
-}
-impl<I> MpegDecoder<I> {
-    pub fn new(paths: I) -> Self {
-        MpegDecoder { paths }
+
+    pub fn decode(&self, fp: File) -> Result<HashMap<Metakey, Box<[u8]>>> {
+        match Id3Tag::read_from(&fp) {
+            Ok(tag) => {
+                let mut metamap = HashMap::new();
+
+                if let Some(s) = tag.title() {
+                    let buf = s.to_string().into_boxed_str().into_boxed_bytes();
+                    metamap.insert(Metakey::Title, buf);
+                }
+                if let Some(s) = tag.artist() {
+                    let buf = s.to_string().into_boxed_str().into_boxed_bytes();
+                    metamap.insert(Metakey::Artist, buf);
+                }
+                if let Some(album) = tag.album() { 
+                    let albuf = album.to_string().into_boxed_str().into_boxed_bytes();
+                    metamap.insert(Metakey::Album, albuf);
+                }
+                if let Some(genre) = tag.genre() {
+                    let genbuf = genre.to_string().into_boxed_str().into_boxed_bytes();
+                    metamap.insert(Metakey::Genre, genbuf);
+                }
+                if let Some(track) = tag.track() {
+                    let buf = Box::new(track.to_le_bytes());
+                    metamap.insert(Metakey::Track, buf);
+                }
+                if let Some(ttrack) = tag.total_tracks() {
+                    let buf = Box::new(ttrack.to_le_bytes());
+                    metamap.insert(Metakey::Totaltracks, buf);
+                }
+                if let Some(artist) = tag.album_artist() { 
+                    let albuf = artist.to_string().into_boxed_str().into_boxed_bytes();
+                    metamap.insert(Metakey::Albumartist, albuf);
+                }
+
+                Ok(metamap)
+            }
+            Err(e) => {
+                let e: DecodeError = e.into();
+                Err(e.into())
+            }
+        }
     }
 }
 

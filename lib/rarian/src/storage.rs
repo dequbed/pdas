@@ -6,6 +6,7 @@ use serde::{Serialize, Deserialize};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub enum Metakey {
     Title,
+    Author,
     Subject,
     Description,
     Date,
@@ -17,6 +18,7 @@ pub enum Metakey {
     Genre,
     Track,
     Totaltracks,
+    Artist,
     Albumartist,
     Lyrics,
 }
@@ -76,6 +78,12 @@ impl<'de> Meta<'de> for Title {
     const KEY: Metakey = Metakey::Title;
 }
 
+pub struct Author;
+impl<'de> Meta<'de> for Author {
+    type Value = &'de str;
+    const KEY: Metakey = Metakey::Author;
+}
+
 pub struct Subject;
 impl<'de> Meta<'de> for Subject {
     type Value = &'de str;
@@ -104,6 +112,12 @@ pub struct Identifier;
 impl<'de> Meta<'de> for Identifier {
     type Value = &'de str;
     const KEY: Metakey = Metakey::Identifier;
+}
+
+pub struct Artist;
+impl<'de> Meta<'de> for Artist {
+    type Value = &'de str;
+    const KEY: Metakey = Metakey::Artist;
 }
 
 // NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,

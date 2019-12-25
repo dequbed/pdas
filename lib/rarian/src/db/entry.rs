@@ -23,18 +23,6 @@ use crate::storage::{Metakey, Meta, metadata_combine};
 use crate::error::{Result, Error};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
-pub struct FileKey {
-    bytes: [u8; 32],
-    filesize: Option<usize>,
-}
-
-impl FileKey {
-    pub fn new(bytes: [u8; 32], filesize: Option<usize>) -> Self {
-        Self { bytes, filesize }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
 pub struct UUID(u128);
 
 impl UUID {
@@ -55,20 +43,20 @@ impl UUID {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntryT<B> {
-    filekeys: HashSet<FileKey>,
+    filekeys: HashSet<String>,
     metadata: HashMap<Metakey, B>,
 }
 impl<'e, B> EntryT<B>
     where B: Serialize + Deserialize<'e> + AsRef<[u8]>,
 {
-    pub fn new(filekey: FileKey, metadata: HashMap<Metakey, B>) -> Self {
+    pub fn new(filekey: String, metadata: HashMap<Metakey, B>) -> Self {
         let mut set = HashSet::new();
         set.insert(filekey);
 
         Self::newv(set, metadata)
     }
 
-    pub fn newv(filekeys: HashSet<FileKey>, metadata: HashMap<Metakey, B>) -> Self {
+    pub fn newv(filekeys: HashSet<String>, metadata: HashMap<Metakey, B>) -> Self {
         Self {
             filekeys,
             metadata,
@@ -87,7 +75,7 @@ impl<'e, B> EntryT<B>
         bincode::serialized_size(self).map_err(Error::Bincode)
     }
 
-    pub fn keys(&self) -> &HashSet<FileKey> {
+    pub fn keys(&self) -> &HashSet<String> {
         &self.filekeys
     }
 
@@ -110,7 +98,7 @@ pub fn combine<'e, B>(a: &'e mut EntryT<B>, b: &'e mut EntryT<B>) -> Option<Entr
         let allkeys = FromIterator::from_iter(
             a.keys()
              .union(b.keys())
-             .map(|x| *x)
+             .map(|x| x.clone())
             );
         Some(EntryT::newv(allkeys, m))
     } else {

@@ -1,17 +1,13 @@
 use clap::{App, ArgMatches};
 
-use rarian::{Iter, DatabaseFlags};
-
 use crate::Librarian;
-use crate::error::Error;
 
-use rarian::{
-    Metadatabase,
-    Stringindexdb,
-    Metadata,
-    Key,
-    Occurance,
+use rarian::db::{
+    EntryDB,
+    TitleDB,
 };
+use rarian::index::Indexer;
+use rarian::db::entry::UUID;
 
 pub fn clap() -> App<'static, 'static> {
     clap_app!( @subcommand db =>
@@ -33,81 +29,22 @@ pub fn clap() -> App<'static, 'static> {
 }
 
 pub fn run(lib: Librarian, matches: &ArgMatches) {
-    let db = Metadatabase::new(lib.dbm.create_named("main").unwrap());
-
     match matches.subcommand() {
         ("create", Some(args)) => {
-            Stringindexdb::create(&lib.dbm, "title").unwrap();
+            //let e = lib.dbm.create_named("entry").unwrap();
+            //let e = EntryDB::new(e);
+            //let t = lib.dbm.create_named("title").unwrap();
+            //let t = TitleDB::new(t);
+            //let i = Indexer::new(e, t);
+
+            //let rtx = lib.dbm.read().unwrap();
+
+            //let u = UUID::generate();
+            //let entry = EntryT::new();
+            //i.index(&mut rtx, u, entry);
         }
-        ("read", Some(args)) => {
-            let r = lib.dbm.read().unwrap();
-
-            if let Some(k) = args.value_of("key") {
-                if let Some(k) = Key::try_parse(k) {
-                    match db.get(&r, &k) {
-                        Ok(r) => println!("{:?}", r),
-                        Err(e) => error!("Error: {:?}", e),
-                    }
-                } else {
-                    error!("Invalid key");
-                }
-            } else {
-                // Clap errors out before this gets hit due to setting SubcommandRequiredElseHelp
-                unreachable!();
-            }
-        }
-        ("dump", _) => {
-            let r = lib.dbm.read().unwrap();
-
-            let c = db.iter_start(&r).unwrap();
-            if let Iter::Err(e) = c {
-                error!("Iterator errored out, aborting: {:?}", e);
-                return;
-            }
-
-            for i in c {
-                match i {
-                    Ok((kref, vref)) => {
-                        let m = Metadata::decode(vref);
-                        println!("{:?}: {:?}", kref, m);
-                    },
-                    Err(e) => {
-                        error!("Retrieval errored out: {:?}", e);
-                    }
-                }
-            }
-        }
-        ("index", _) => {
-            let idb = Stringindexdb::open(&lib.dbm, "title").unwrap();
-            let r = lib.dbm.read().unwrap();
-            let is = idb.iter_start(&r).unwrap();
-
-            if let Iter::Err(e) = is {
-                error!("Iterator errored out, aborting: {:?}", e);
-                return;
-            }
-
-            for i in is {
-                match i {
-                    Ok((kref, vref)) => {
-                        let r: Result<Occurance, Error> = Occurance::deserialize(vref).map_err(Error::Rarian);
-                        match r {
-                            Ok(o) => println!("{:?}: {:?}", kref, o),
-                            Err(e) => error!("Failed to decode index value: {:?}", e),
-                        }
-                    },
-                    Err(e) => {
-                        error!("Retrieval errored out: {:?}", e);
-                    }
-                }
-            }
-        }
-        ("search", Some(a)) => {
-            let needle = a.value_of("term").unwrap();
-            let idb = Stringindexdb::open(&lib.dbm, "title").unwrap();
-            let r = lib.dbm.read().unwrap();
-
-            rarian::find(db, idb, r, needle);
+        ("archive", Some(args)) => {
+            
         }
         _ => {}
     }

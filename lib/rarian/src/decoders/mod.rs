@@ -15,4 +15,5 @@ pub enum DecodeError {
     Metaflac(metaflac::Error),
     Id3(::id3::Error),
     Epub,
+    NotFound,
 }

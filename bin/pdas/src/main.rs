@@ -3,16 +3,10 @@ extern crate clap;
 
 #[macro_use]
 extern crate log;
-extern crate stderrlog;
-
-extern crate directories;
-extern crate toml;
 
 #[cfg(test)]
 #[macro_use]
 extern crate maplit;
-
-extern crate rarian;
 
 mod config;
 mod error;

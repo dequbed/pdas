@@ -3,6 +3,8 @@
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate futures;
 
 mod storage;
 mod error;
@@ -11,6 +13,9 @@ mod database;
 pub mod db;
 pub mod index;
 pub mod decode;
+mod decoders;
+pub mod archive;
+
 
 pub use lmdb::{
     EnvironmentFlags,

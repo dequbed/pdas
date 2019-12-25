@@ -1,5 +1,5 @@
 use clap::{App, ArgMatches};
-use rarian::init;
+use git_annex::init::init;
 use crate::{config, Librarian};
 use crate::config::Remote;
 
