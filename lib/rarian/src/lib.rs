@@ -6,28 +6,11 @@ extern crate lazy_static;
 #[macro_use]
 extern crate futures;
 
-//mod storage;
 mod error;
-//mod database;
 
+// Storage of entries & indices
 pub mod db;
+// Creation, updating & managing of indices
 pub mod index;
-//pub mod decode;
-//mod decoders;
-//pub mod archive;
-
-
-pub use lmdb::{
-    EnvironmentFlags,
-    DatabaseFlags,
-    Iter,
-};
-
-pub use error::{Result, Error};
-
-pub use db::dbm::{
-    DBManager,
-};
-pub use db::meta::{
-    Metakey,
-};
+// Querying indices and entries
+pub mod query;
