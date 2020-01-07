@@ -27,10 +27,7 @@ pub use error::{Result, Error};
 
 pub use db::dbm::{
     DBManager,
-    Key,
 };
 pub use db::meta::{
-    Metadata,
-    MetadataOwned,
     Metakey,
 };

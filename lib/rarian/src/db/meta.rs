@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use crate::db::dbm::Key;
 
 use serde::{Serialize, Deserialize};
 
@@ -120,118 +119,11 @@ impl<'de> Meta<'de> for Artist {
     const KEY: Metakey = Metakey::Artist;
 }
 
-// NOTICE: This structure should always be READ-optimized. Heavy memcpy for writes is acceptable,
-// but reading must not need to copy or do expensive decoding operations
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MetadataS<S, B> {
-    /// A human-readable identifier for this object. The tile will be tokenized and indexed, so
-    /// it may contain several words.
-    /// It should not contain redundant information, e.g. name the author when the 'author' field
-    /// is already set.
-    pub title: S,
-
-    /// The lifeform or intelligent computer program that created this object.
-    // Sadly we don't always have an author in the metadata
-    pub author: Option<S>,
-
-    /// The Filename is relatively often used so we save it as well
-    pub filename: S,
-
-
-    /// the size in bytes of the object this data belongs to
-    pub filesize: Option<usize>,
-
-    metamap: HashMap<Metakey, B>,
-}
-
-use crate::error::Error;
-
-impl<'e, S, B> MetadataS<S, B> 
-    where S: Serialize + Deserialize<'e> + AsRef<str>,
-          B: Serialize + Deserialize<'e> + AsRef<[u8]>,
-{
-    pub fn new(title: S, author: Option<S>, filename: S, filesize: Option<usize>, metamap: HashMap<Metakey, B>) -> Self {
-        Self {
-            title, author, filename, filesize, metamap
-        }
-    }
-
-    #[inline(always)]
-    pub fn decode(bytes: &'e [u8]) -> Result<Self, Error> {
-        bincode::deserialize(bytes).map_err(Error::Bincode)
-    }
-
-    #[inline(always)]
-    pub fn encode_into(&self, bytes: &mut [u8]) -> Result<(), Error> {
-        bincode::serialize_into(bytes, &self).map_err(Error::Bincode)
-    }
-
-    #[inline(always)]
-    pub fn encoded_size(&self) -> Result<u64, Error> {
-        bincode::serialized_size(self).map_err(Error::Bincode)
-    }
-
-    #[inline(always)]
-    pub fn get<T: Meta<'e>>(&'e self) -> Option<T::Value> {
-        self.metamap.get(&T::KEY).map(|r: &B| T::decode(r.as_ref()))
-    }
-}
-
-pub type Metadata<'e> = MetadataS<&'e str, &'e [u8]>;
-pub type MetadataOwned = MetadataS<String, Box<[u8]>>;
-
 pub fn metadata_combine<'e, B>(a: &'e HashMap<Metakey, B>, b: &'e HashMap<Metakey, B>)
     -> Option<HashMap<Metakey, B>>
     where B: Serialize + Deserialize<'e> + AsRef<[u8]> + Clone
 {
     Some(a.clone())
-}
-
-pub fn merge(mut a: HashMap<Key, MetadataOwned>, mut b: HashMap<Key, MetadataOwned>) 
-    -> Result<
-        HashMap<Key, MetadataOwned>, 
-        (HashMap<Key, MetadataOwned>, HashMap<Key, MetadataOwned>, HashMap<Key, MetadataOwned>)
-    > {
-    use std::collections::hash_map::Entry;
-
-    let mut a2 = HashMap::new();
-    let mut b2 = HashMap::new();
-
-    let mut clean = true;
-
-    for (k,v) in a.drain() {
-        match b.entry(k) {
-            Entry::Vacant(e) => {
-                e.insert(v);
-            },
-            Entry::Occupied(e) => {
-                clean = false;
-                let (_,vb) = e.remove_entry();
-
-                match merge_single(v,vb) {
-                    Ok(new) => {
-                        b.insert(k,new);
-                    },
-                    Err((va,vb)) => {
-                        a2.insert(k, va);
-                        b2.insert(k, vb);
-                    }
-                }
-            }
-        }
-    }
-
-    if clean {
-        Ok(b)
-    } else {
-        Err((b, a2, b2))
-    }
-}
-
-pub fn merge_single(a: MetadataOwned, b: MetadataOwned) 
-    -> Result<MetadataOwned, (MetadataOwned, MetadataOwned)> 
-{
-    return Err((a,b));
 }
 
 #[cfg(test)]
