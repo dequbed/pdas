@@ -6,15 +6,15 @@ extern crate lazy_static;
 #[macro_use]
 extern crate futures;
 
-mod storage;
+//mod storage;
 mod error;
-mod database;
+//mod database;
 
 pub mod db;
 pub mod index;
-pub mod decode;
-mod decoders;
-pub mod archive;
+//pub mod decode;
+//mod decoders;
+//pub mod archive;
 
 
 pub use lmdb::{
@@ -25,11 +25,11 @@ pub use lmdb::{
 
 pub use error::{Result, Error};
 
-pub use database::{
+pub use db::dbm::{
     DBManager,
     Key,
 };
-pub use storage::{
+pub use db::meta::{
     Metadata,
     MetadataOwned,
     Metakey,

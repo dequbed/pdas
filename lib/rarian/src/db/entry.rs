@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::iter::FromIterator;
 
+use std::hash::{Hash, Hasher};
+
 use uuid::Uuid;
 
 use libc::size_t;
@@ -19,7 +21,7 @@ use serde::{
     Serialize,
 };
 
-use crate::storage::{Metakey, Meta, metadata_combine};
+use crate::db::meta::{Metakey, Meta, metadata_combine};
 use crate::error::{Result, Error};
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash)]
@@ -41,24 +43,48 @@ impl UUID {
     }
 }
 
+type FileKey = String;
+type FormatKey = u32;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A file indexed by git-annex
+///
+/// Important: This struct has custom `Eq` and `Hash` behaviour in that only the key will be
+/// considered, format metadata is ignored.
+pub struct FileT<B> {
+    key: FileKey,
+    format: HashMap<FormatKey, B>,
+}
+impl<B> PartialEq for FileT<B> {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+impl<B> Eq for FileT<B> {}
+impl<B> Hash for FileT<B> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.key.hash(state);
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EntryT<B> {
-    filekeys: HashSet<String>,
+    files: HashSet<FileT<B>>,
     metadata: HashMap<Metakey, B>,
 }
 impl<'e, B> EntryT<B>
     where B: Serialize + Deserialize<'e> + AsRef<[u8]>,
 {
-    pub fn new(filekey: String, metadata: HashMap<Metakey, B>) -> Self {
+    pub fn new(filekey: FileT<B>, metadata: HashMap<Metakey, B>) -> Self {
         let mut set = HashSet::new();
         set.insert(filekey);
 
         Self::newv(set, metadata)
     }
 
-    pub fn newv(filekeys: HashSet<String>, metadata: HashMap<Metakey, B>) -> Self {
+    pub fn newv(files: HashSet<FileT<B>>, metadata: HashMap<Metakey, B>) -> Self {
         Self {
-            filekeys,
+            files,
             metadata,
         }
     }
@@ -75,8 +101,8 @@ impl<'e, B> EntryT<B>
         bincode::serialized_size(self).map_err(Error::Bincode)
     }
 
-    pub fn keys(&self) -> &HashSet<String> {
-        &self.filekeys
+    pub fn keys(&self) -> &HashSet<FileT<B>> {
+        &self.files
     }
 
     pub fn get<T: Meta<'e>>(&'e self) -> Option<T::Value> {
@@ -86,6 +112,14 @@ impl<'e, B> EntryT<B>
     pub fn metadata(&self) -> &HashMap<Metakey, B> {
         &self.metadata
     }
+
+    pub fn to_yaml(&self) -> std::result::Result<String, serde_yaml::Error> {
+        serde_yaml::to_string(self)
+    }
+}
+
+pub fn from_yaml(s: &str) -> std::result::Result<EntryOwn, serde_yaml::Error> {
+    serde_yaml::from_str(s)
 }
 
 pub type Entry<'e> = EntryT<&'e [u8]>;

@@ -1,5 +1,5 @@
 use crate::error::{Result, Error};
-use crate::storage::{Metadata, MetadataS, MetadataOwned};
+use super::meta::{Metadata, MetadataS, MetadataOwned};
 use serde::{Serialize, Deserialize};
 use libc::size_t;
 use std::fmt;

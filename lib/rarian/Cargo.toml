@@ -22,6 +22,7 @@ rand = "0.7"
 metaflac = "0.1"
 id3 = "0.3"
 epub = "1.2"
+serde_yaml = "0.8"
 
 uuid = { version = "0.8", features = ["v4"] }
 

@@ -1,7 +1,6 @@
 use std::io;
 use std::str;
 use json;
-use crate::decoders;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -12,7 +11,6 @@ pub enum Error {
     Io(io::Error),
     Json(json::Error),
     Utf8(str::Utf8Error),
-    Decode(decoders::DecodeError),
 }
 
 impl From<bincode::Error> for Error {
@@ -36,11 +34,5 @@ impl From<io::Error> for Error {
 impl From<json::Error> for Error {
     fn from(e: json::Error) -> Self {
         Error::Json(e)
-    }
-}
-
-impl From<decoders::DecodeError> for Error {
-    fn from(e: decoders::DecodeError) -> Self {
-        Error::Decode(e)
     }
 }

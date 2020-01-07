@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use crate::database::Key;
+use crate::db::dbm::Key;
 
 use serde::{Serialize, Deserialize};
 
