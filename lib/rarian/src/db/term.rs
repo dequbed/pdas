@@ -49,11 +49,11 @@ impl Matches {
 }
 
 #[derive(Copy, Clone)]
-pub struct TitleDB {
+pub struct TermDB {
     db: Database,
 }
 
-impl TitleDB {
+impl TermDB {
     pub fn new(db: Database) -> Self {
         Self { db }
     }
