@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use std::iter::FromIterator;
 
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::convert::TryInto;
 use std::path::Path;
 use std::hash::{Hash, Hasher};
@@ -46,9 +46,6 @@ impl UUID {
     }
     pub fn as_bytes(self) -> [u8; 16] {
         self.0.to_le_bytes()
-    }
-    pub fn to_string(self) -> String {
-        "".to_string()
     }
 }
 
@@ -162,8 +159,8 @@ impl<B: Eq> PartialEq for EntryT<B> {
     }
 }
 
-pub fn from_yaml(s: &str) -> std::result::Result<EntryOwn, serde_yaml::Error> {
-    serde_yaml::from_str(s)
+pub fn from_yaml(s: &[u8]) -> std::result::Result<EntryOwn, serde_yaml::Error> {
+    serde_yaml::from_slice(s)
 }
 
 pub type Entry<'e> = EntryT<&'e [u8]>;
@@ -227,10 +224,42 @@ impl EntryDB {
 
                 let mut p = Path::join(&dir, "entries/");
                 fs::create_dir_all(&p)?;
-                p.set_file_name(format!("{}.yaml", u.to_string()));
-                let mut fp = File::open(p)?;
+                p.push(format!("{}.yaml", u.as_uuid()));
+                let mut fp = File::create(&p)?;
                 let s = e.to_yaml()?;
+                println!("Writing file: {:?}", &p);
                 fp.write_all(s.as_ref())?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn import(self, dir: &Path, txn: &mut RwTransaction) -> Result<()> {
+        let dir = dir.join("entries/");
+        println!("Reading dir: {:?}", dir);
+        let entries = fs::read_dir(dir)?;
+
+
+        let i = entries
+            .filter_map(std::result::Result::ok)
+            .filter(|d| {
+                if let Ok(true) = d.file_type().and_then(|f| Ok(f.is_file())) {
+                    return true;
+                }
+                return false;
+            })
+            .map(|d| d.path());
+
+        for path in i {
+            if let Some(uuid_str) = path.file_stem().and_then(|os| os.to_str()) {
+                let u = UUID::new(Uuid::parse_str(uuid_str)?);
+                let mut fp = File::open(path)?;
+                let mut buf = Vec::new();
+                fp.read_to_end(&mut buf)?;
+                let e = from_yaml(&buf)?;
+
+                self.put(txn, &u, &e)?;
             }
         }
 

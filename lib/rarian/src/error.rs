@@ -1,6 +1,7 @@
 use std::io;
 use std::str;
 use json;
+use uuid;
 
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -12,6 +13,7 @@ pub enum Error {
     Json(json::Error),
     Yaml(serde_yaml::Error),
     Utf8(str::Utf8Error),
+    UUID(uuid::Error)
 }
 
 impl From<bincode::Error> for Error {
@@ -41,5 +43,11 @@ impl From<json::Error> for Error {
 impl From<serde_yaml::Error> for Error {
     fn from(e: serde_yaml::Error) -> Self {
         Error::Yaml(e)
+    }
+}
+
+impl From<uuid::Error> for Error {
+    fn from(e: uuid::Error) -> Self {
+        Error::UUID(e)
     }
 }

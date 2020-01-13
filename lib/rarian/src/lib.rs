@@ -59,4 +59,9 @@ impl RMDSE {
         let txn = self.dbm.read()?;
         self.entry.export(dir.as_ref(), &txn)
     }
+
+    pub fn import<P: AsRef<Path>>(&self, dir: P) -> Result<()> {
+        let mut txn = self.dbm.write()?;
+        self.entry.import(dir.as_ref(), &mut txn)
+    }
 }
