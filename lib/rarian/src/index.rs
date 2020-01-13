@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use serde::{Serialize, Deserialize};
 use rust_stemmers::{Algorithm, Stemmer};
 use lmdb::{
+    Transaction,
     RwTransaction,
 };
 
@@ -64,36 +65,41 @@ impl TermIndex {
     }
 }
 
-pub struct Indexer {
+pub struct Indexer<'txn> {
+    txn: RwTransaction<'txn>,
     entrydb: EntryDB,
     indexer: HashMap<Metakey, Index>,
 }
 
-impl Indexer {
-    pub fn new(entrydb: EntryDB, indexer: HashMap<Metakey, Index>) -> Self {
+impl<'txn> Indexer<'txn> {
+    pub fn new(txn: RwTransaction<'txn>, entrydb: EntryDB, indexer: HashMap<Metakey, Index>) -> Self {
         Indexer { 
+            txn,
             entrydb,
             indexer,
         }
     }
 
-    pub fn index<'txn, B>
+    pub fn index<B>
         ( &mut self
-        , txn: &'txn mut RwTransaction
         , uuid: UUID
-        , entry: EntryT<B>
+        , entry: &EntryT<B>
         )
         -> Result<()>
         where B: Serialize + Deserialize<'txn> + AsRef<[u8]>
     {
         for (k,v) in entry.metadata().iter() {
             if let Some(i) = self.indexer.get_mut(k) {
-                i.index(txn, v.as_ref(), uuid)?;
+                i.index(&mut self.txn, v.as_ref(), uuid)?;
             }
         }
-        self.entrydb.put(txn, &uuid, entry)?;
+        self.entrydb.put(&mut self.txn, &uuid, entry)?;
 
         Ok(())
+    }
+
+    pub fn commit(self) -> Result<()> {
+        self.txn.commit().map_err(Error::LMDB)
     }
 }
 

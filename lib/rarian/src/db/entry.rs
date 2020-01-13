@@ -21,6 +21,8 @@ use serde::{
     Serialize,
 };
 
+use crate::db::dbm::DBManager;
+
 use crate::db::meta::Metakey;
 use crate::error::{Result, Error};
 
@@ -67,7 +69,25 @@ impl<B> Hash for FileT<B> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+impl<B> FileT<B> {
+    pub fn new(key: FileKey, format: HashMap<FormatKey, B>) -> Self {
+        Self { key, format}
+    }
+}
+
+impl<B: AsRef<[u8]>> FileT<B> {
+    pub fn ref_eq<A>(&self, other: &FileT<A>) -> bool
+        where A: AsRef<[u8]>
+    {
+        self.key == other.key &&
+            std::iter::Iterator::eq(
+                self.format.iter().map(|(k,v)| (k, v.as_ref())), 
+                other.format.iter().map(|(k,v)| (k, v.as_ref())))
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 /// A metadata entry
 ///
 /// Each entry connects a metadata map to a set of filekeys. All filekey should identifiy the
@@ -119,6 +139,20 @@ impl<'e, B> EntryT<B>
     pub fn to_yaml(&self) -> std::result::Result<String, serde_yaml::Error> {
         serde_yaml::to_string(self)
     }
+
+    pub fn meta_ref_eq<A>(&self, other: &EntryT<A>) -> bool
+        where A: AsRef<[u8]>
+    {
+        std::iter::Iterator::eq(
+            self.metadata.iter().map(|(k,v)| (k, v.as_ref())), 
+            other.metadata.iter().map(|(k,v)| (k, v.as_ref())))
+    }
+}
+impl<B: Eq> PartialEq for EntryT<B> {
+    fn eq(&self, other: &Self) -> bool {
+        self.files == other.files && 
+            std::iter::Iterator::eq(self.metadata.iter(), other.metadata.iter())
+    }
 }
 
 pub fn from_yaml(s: &str) -> std::result::Result<EntryOwn, serde_yaml::Error> {
@@ -134,6 +168,11 @@ pub struct EntryDB {
 }
 
 impl EntryDB {
+    pub fn open(dbm: &DBManager) -> Result<Self> {
+         let db = dbm.create_named("entry")?;
+         Ok( Self::new(db) )
+    }
+
     pub fn new(db: Database) -> Self {
         Self { db }
     }
@@ -150,7 +189,7 @@ impl EntryDB {
         self.get_bytes(txn, &key.as_bytes()).and_then(Entry::decode)
     }
 
-    pub fn put<'txn, B>(self, txn: &'txn mut RwTransaction, key: &UUID, e: EntryT<B>) -> Result<()>
+    pub fn put<'txn, B>(self, txn: &mut RwTransaction, key: &UUID, e: &EntryT<B>) -> Result<()>
         where B: AsRef<[u8]> + Serialize + Deserialize<'txn>
     {
         let len = e.encoded_size()? as usize;
@@ -161,5 +200,17 @@ impl EntryDB {
     pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<Iter<'txn>> {
         let mut cursor = txn.open_ro_cursor(self.db)?;
         Ok(cursor.iter_start())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn uuid_cast() {
+        let uuid_1 = UUID::generate();
+        let uuid_i = uuid_1.as_uuid();
+        assert_eq!(uuid_1, UUID::new(uuid_i));
     }
 }

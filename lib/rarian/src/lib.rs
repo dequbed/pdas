@@ -15,6 +15,8 @@ pub mod index;
 // Querying indices and entries
 pub mod query;
 
+pub mod schema;
+
 use std::path::Path;
 use std::collections::HashMap;
 
@@ -22,29 +24,34 @@ use error::Result;
 use index::Indexer;
 use db::{dbm::DBManager, EntryDB};
 use db::entry::{EntryT, UUID};
+use query::Query;
 
 use serde::{Serialize, Deserialize};
 
 pub struct RMDSE {
     dbm: DBManager,
-    index: Indexer,
+    entry: EntryDB,
 }
 
 impl RMDSE {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<RMDSE> {
-        let dbmb = DBManager::builder();
+        let mut dbmb = DBManager::builder();
+        dbmb.set_flags(lmdb::EnvironmentFlags::MAP_ASYNC | lmdb::EnvironmentFlags::WRITE_MAP);
+        dbmb.set_map_size(10485760);
+        dbmb.set_max_dbs(4);
         let dbm = DBManager::from_builder(path.as_ref(), dbmb)?;
-        let entry = dbm.open_named("entry")?;
-        let index = Indexer::new(EntryDB::new(entry), HashMap::new());
+        let entry = EntryDB::open(&dbm)?;
 
-        Ok( Self { dbm, index } )
+        Ok( Self { dbm, entry } )
     }
 
-    pub fn indexer(&mut self) -> &mut Indexer {
-        &mut self.index
+    pub fn indexer(&self) -> Result<Indexer> {
+        let txn = self.dbm.write()?;
+        Ok(Indexer::new(txn, self.entry, HashMap::new()))
     }
 
-    pub fn dbm(&mut self) -> &mut DBManager {
-        &mut self.dbm
+    pub fn query(&self) -> Result<Query> {
+        let txn = self.dbm.read()?;
+        Ok(Query::new(txn, self.entry))
     }
 }
