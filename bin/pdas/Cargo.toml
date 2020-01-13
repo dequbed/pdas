@@ -17,5 +17,7 @@ stderrlog = "0.4"
 rarian = { path = "../../lib/rarian" }
 git-annex = { path = "../../lib/annex" }
 
+tempfile = "*"
+
 [dev-dependencies]
 maplit = "1.0"
