@@ -2,6 +2,10 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::iter::FromIterator;
 
+use std::fs::{self, File};
+use std::io::Write;
+use std::convert::TryInto;
+use std::path::Path;
 use std::hash::{Hash, Hasher};
 
 use uuid::Uuid;
@@ -42,6 +46,9 @@ impl UUID {
     }
     pub fn as_bytes(self) -> [u8; 16] {
         self.0.to_le_bytes()
+    }
+    pub fn to_string(self) -> String {
+        "".to_string()
     }
 }
 
@@ -200,6 +207,34 @@ impl EntryDB {
     pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<Iter<'txn>> {
         let mut cursor = txn.open_ro_cursor(self.db)?;
         Ok(cursor.iter_start())
+    }
+
+    pub fn export<'txn, T: Transaction>(&self, dir: &Path, txn: &'txn T) -> Result<()> {
+        let i = self.iter_start(txn)?;
+
+        for r in i {
+            if let Ok((k,v)) = r {
+                let e = Entry::decode(v)?;
+                let u = {
+                    let (int_bytes, _rest) = k.split_at(std::mem::size_of::<u128>());
+                    // This can fail if for some reason entrydb keys are less than 16 bytes long.
+                    // In that case we don't have any idea how to handle or export that entry. Just
+                    // give up.
+                    let u = u128::from_le_bytes(int_bytes.try_into().unwrap());
+
+                    UUID(u)
+                };
+
+                let mut p = Path::join(&dir, "entries/");
+                fs::create_dir_all(&p)?;
+                p.set_file_name(format!("{}.yaml", u.to_string()));
+                let mut fp = File::open(p)?;
+                let s = e.to_yaml()?;
+                fp.write_all(s.as_ref())?;
+            }
+        }
+
+        Ok(())
     }
 }
 

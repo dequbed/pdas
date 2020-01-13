@@ -54,4 +54,9 @@ impl RMDSE {
         let txn = self.dbm.read()?;
         Ok(Query::new(txn, self.entry))
     }
+
+    pub fn export<P: AsRef<Path>>(&self, dir: P) -> Result<()> {
+        let txn = self.dbm.read()?;
+        self.entry.export(dir.as_ref(), &txn)
+    }
 }

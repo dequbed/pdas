@@ -10,6 +10,7 @@ pub enum Error {
     LMDB(lmdb::Error),
     Io(io::Error),
     Json(json::Error),
+    Yaml(serde_yaml::Error),
     Utf8(str::Utf8Error),
 }
 
@@ -34,5 +35,11 @@ impl From<io::Error> for Error {
 impl From<json::Error> for Error {
     fn from(e: json::Error) -> Self {
         Error::Json(e)
+    }
+}
+
+impl From<serde_yaml::Error> for Error {
+    fn from(e: serde_yaml::Error) -> Self {
+        Error::Yaml(e)
     }
 }
