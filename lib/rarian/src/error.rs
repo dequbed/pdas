@@ -51,3 +51,15 @@ impl From<uuid::Error> for Error {
         Error::UUID(e)
     }
 }
+
+impl From<std::str::Utf8Error> for Error {
+    fn from(e: std::str::Utf8Error) -> Self {
+        Error::Utf8(e)
+    }
+}
+
+impl From<std::string::FromUtf8Error> for Error {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        Error::Utf8(e.utf8_error())
+    }
+}

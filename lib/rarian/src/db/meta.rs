@@ -2,7 +2,14 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Serialize, Deserialize};
 
-pub type Metakey = u32;
+//pub type Metakey = u32;
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Metakey {
+    Date,
+    Title,
+    Description,
+    Artist,
+}
 
 pub trait Metavalue<'de> {
     fn decode(bytes: &'de [u8]) -> Self;

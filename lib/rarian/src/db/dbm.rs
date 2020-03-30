@@ -7,6 +7,7 @@ use rust_stemmers::{Algorithm, Stemmer};
 
 pub use lmdb::{
     Environment,
+    EnvironmentFlags,
     EnvironmentBuilder,
     Database,
     DatabaseFlags,
@@ -37,6 +38,10 @@ impl DBManager {
         })
     }
 
+    pub fn open(&self) -> Result<lmdb::Database> {
+        self.env.open_db(None).map_err(Error::LMDB)
+    }
+
     pub fn open_named(&self, name: &str) -> Result<lmdb::Database> {
         self.env.open_db(Some(name)).map_err(Error::LMDB)
     }
@@ -44,6 +49,7 @@ impl DBManager {
     pub fn create_named(&self, name: &str) -> Result<lmdb::Database> {
         self.env.create_db(Some(name), DatabaseFlags::empty()).map_err(Error::LMDB)
     }
+
     pub fn create_named_flags(&self, name: &str, flags: DatabaseFlags) -> Result<lmdb::Database> {
         self.env.create_db(Some(name), flags).map_err(Error::LMDB)
     }

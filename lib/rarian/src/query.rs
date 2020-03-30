@@ -1,10 +1,14 @@
+use std::ops::Bound;
+
 use crate::error::*;
 
 use crate::db::{
     EntryDB,
+    RangeDB,
     entry::Entry,
-    entry::UUID,
 };
+
+use crate::uuid::UUID;
 
 use crate::db::dbm::{
     DBManager,
@@ -43,3 +47,31 @@ impl<'txn, 't> Query<'txn> {
         self.entrydb.get(&self.txn, &uuid)
     }
 }
+
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
+pub struct RangeQuery {
+    pub upper: Bound<u64>,
+    pub lower: Bound<u64>,
+}
+
+impl RangeQuery {
+    pub fn new(upper: Bound<u64>, lower: Bound<u64>) -> Self {
+        Self { upper, lower }
+    }
+
+    pub fn run(self, db: &RangeDB) -> impl Iterator<Item = (&u64, &UUID)> {
+        db.range((self.lower,self.upper))
+    }
+}
+
+// Query: Takes specific index, gives a Set of valid UUIDs
+//   Range
+//   Text match
+//
+// Combiner: Take multiple sets of UUIDs, combines into one
+//   AND
+//   OR
+//
+// Transformers (get a single set)
+//   Sorting: Sort Set of UUIDs
+//   Filter: filter by something
