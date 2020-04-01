@@ -13,7 +13,9 @@ pub enum Error {
     Json(json::Error),
     Yaml(serde_yaml::Error),
     Utf8(str::Utf8Error),
-    UUID(uuid::Error)
+    UUID(uuid::Error),
+    QueryType,
+    QueryIterating,
 }
 
 impl From<bincode::Error> for Error {

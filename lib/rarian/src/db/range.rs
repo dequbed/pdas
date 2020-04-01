@@ -14,7 +14,7 @@ use crate::error::{Result, Error};
 pub struct RangeDB {
     db: lmdb::Database,
     name: String,
-    map: BTreeMap<u64, UUID>,
+    pub map: BTreeMap<u64, UUID>,
 }
 
 impl RangeDB {

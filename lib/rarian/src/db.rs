@@ -30,8 +30,8 @@ use std::io::{Read, Write};
 
 /// Main DB type, keeps track of entries and indices
 pub struct Database<'env> {
-    entries: EntryDB,
-    indices: HashMap<meta::Metakey, Index>,
+    pub entries: EntryDB,
+    pub indices: HashMap<meta::Metakey, Index>,
     // Surrounding Transaction
     txn: RwTransaction<'env>,
 }
@@ -75,7 +75,7 @@ impl<'env> Database<'env> {
 
         for (k, desc) in schema.indices.iter() {
             println!("Creating index for {:?}", k);
-            Index::create(&mut txn, db, dbm, desc).ok();
+            Index::create(&mut txn, db, desc).ok();
             println!("index {:?} created", k);
         }
 
@@ -222,8 +222,8 @@ impl Index {
     }
 
     #[inline]
-    pub fn create(txn: &mut RwTransaction, db: lmdb::Database, dbm: &DBManager, desc:
-        &IndexDescription) -> Result<()>
+    pub fn create(txn: &mut RwTransaction, db: lmdb::Database, desc: &IndexDescription) 
+        -> Result<()>
     {
         match desc {
             IndexDescription::RangeTree { name } => {
