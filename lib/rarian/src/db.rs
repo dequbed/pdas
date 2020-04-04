@@ -52,8 +52,8 @@ impl<'env> Database<'env> {
         let b = txn.get(db, &name.as_bytes())?;
         let schema = Schema::decode(b)?;
 
-        let indices: HashMap<meta::Metakey, Index> = schema.indices.iter()
-            .filter_map(|(k,d)| Index::construct(&txn, db, d).ok().map(|x| (*k,x)))
+        let indices: HashMap<meta::Metakey, Index> = schema.attributes.iter()
+            .filter_map(|(k,a)| Index::construct(&txn, db, &a.index).ok().map(|x| (*k,x)))
             .collect();
 
         let entries = unsafe { txn.open_db(Some(roname))? };
@@ -73,9 +73,9 @@ impl<'env> Database<'env> {
         let schema_buf = txn.reserve(db, &name.as_bytes(), schema_size, lmdb::WriteFlags::empty())?;
         schema.encode_into(schema_buf)?;
 
-        for (k, desc) in schema.indices.iter() {
+        for (k, attribute) in schema.attributes.iter() {
             println!("Creating index for {:?}", k);
-            Index::create(&mut txn, db, desc).ok();
+            Index::create(&mut txn, db, &attribute.index).ok();
             println!("index {:?} created", k);
         }
 

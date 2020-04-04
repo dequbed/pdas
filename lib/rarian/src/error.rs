@@ -16,6 +16,10 @@ pub enum Error {
     UUID(uuid::Error),
     QueryType,
     QueryIterating,
+    QueryUnbalanced,
+    QueryUnexpectedEOS,
+    QueryBadInt(std::num::ParseIntError),
+    BadMetakey,
 }
 
 impl From<bincode::Error> for Error {
@@ -63,5 +67,11 @@ impl From<std::str::Utf8Error> for Error {
 impl From<std::string::FromUtf8Error> for Error {
     fn from(e: std::string::FromUtf8Error) -> Self {
         Error::Utf8(e.utf8_error())
+    }
+}
+
+impl From<std::num::ParseIntError> for Error {
+    fn from(e: std::num::ParseIntError) -> Self {
+        Error::QueryBadInt(e)
     }
 }
