@@ -22,17 +22,17 @@ enum Attributetype {
 /// meta-information for humans like a name and description
 /// It also defines what attributes an entry has and what types those attributes are. 
 /// Lastly the indices for the db are saved
-pub struct Schema<'a> {
+pub struct Schema {
     /// Human-readable identifier of the database
-    pub name: &'a str,
+    pub name: String,
 
     /// A (short) description of the intended use of the database
-    pub description: &'a str,
+    pub description: String,
 
     /// Version of rarian-lib this database was last opened with. Used for compatability
     pub version: (u32, u32),
 
-    pub attributes: HashMap<Metakey, Attribute>,
+    pub attributes: HashMap<Metakey, IndexDescription>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,8 +40,8 @@ pub struct Attribute {
     pub index: IndexDescription,
 }
 
-impl<'a> Schema<'a> {
-    pub fn decode(bytes: &'a [u8]) -> Result<Self> {
+impl<'a> Schema {
+    pub fn decode(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).map_err(Error::Bincode)
     }
 
@@ -56,7 +56,13 @@ impl<'a> Schema<'a> {
     pub fn to_yaml(&self) -> std::result::Result<String, serde_yaml::Error> {
         serde_yaml::to_string(self)
     }
+
+    pub fn from_yaml(input: &[u8]) -> Result<Self> {
+        let s = serde_yaml::from_slice(input)?;
+        Ok(s)
+    }
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IndexDescription {

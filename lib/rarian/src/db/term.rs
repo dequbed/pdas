@@ -38,6 +38,10 @@ impl Matches {
         Self ( set )
     }
 
+    pub fn empty() -> Self {
+        Self ( HashSet::with_capacity(0) )
+    }
+
     pub fn into_set(self) -> HashSet<UUID> {
         self.0
     }
@@ -79,7 +83,12 @@ impl TermDB {
     }
 
     pub fn get<'txn, T: Transaction>(self, txn: &'txn T, key: &str) -> Result<Matches> {
-        self.get_bytes(txn, &key).and_then(Matches::decode)
+        self.get_bytes(txn, &key)
+            .and_then(Matches::decode)
+            .or_else(|e| match e {
+                Error::LMDB(lmdb::Error::NotFound) => Ok(Matches::empty()),
+                e => Err(e),
+            })
     }
 
     pub fn put<'txn>(self, txn: &'txn mut RwTransaction, key: &str, m: Matches) -> Result<()>

@@ -29,22 +29,18 @@ use std::fs::{self, File};
 use std::io::{Read, Write};
 
 /// Main DB type, keeps track of entries and indices
-pub struct Database<'env> {
+pub struct Database {
     pub entries: EntryDB,
     pub indices: HashMap<meta::Metakey, Index>,
-    // Surrounding Transaction
-    txn: RwTransaction<'env>,
 }
 
-impl<'env> Database<'env> {
-    fn new(entries: EntryDB, indices: HashMap<meta::Metakey, Index>, txn: RwTransaction<'env>) -> Self {
-        Self { entries, indices, txn }
+impl<'env> Database {
+    fn new(entries: EntryDB, indices: HashMap<meta::Metakey, Index>) -> Self {
+        Self { entries, indices }
     }
 
-    pub fn open(dbm: &'env DBManager, roname: &str) -> Result<Self> {
+    pub fn open(txn: &RoTransaction, dbm: &'env DBManager, roname: &str) -> Result<Self> {
         let mut name = roname.to_string();
-
-        let txn = dbm.write()?;
 
         let db = unsafe { txn.open_db(None)? };
         name.push_str("_schema");
@@ -53,19 +49,18 @@ impl<'env> Database<'env> {
         let schema = Schema::decode(b)?;
 
         let indices: HashMap<meta::Metakey, Index> = schema.attributes.iter()
-            .filter_map(|(k,a)| Index::construct(&txn, db, &a.index).ok().map(|x| (*k,x)))
+            .filter_map(|(k,a)| Index::construct(txn, db, a).ok().map(|x| (*k,x)))
             .collect();
 
         let entries = unsafe { txn.open_db(Some(roname))? };
         let entries = EntryDB::new(entries);
 
-        Ok(Self::new(entries, indices, txn))
+        Ok(Self::new(entries, indices))
     }
 
-    pub fn create(dbm: &'env DBManager, roname: &str, schema: Schema) -> Result<()> {
+    pub fn create(txn: &mut RwTransaction, dbm: &'env DBManager, roname: &str, schema: Schema) -> Result<()> {
         let mut name = roname.to_string();
 
-        let mut txn = dbm.write()?;
         let db = dbm.open()?;
         name.push_str("_schema");
 
@@ -73,9 +68,9 @@ impl<'env> Database<'env> {
         let schema_buf = txn.reserve(db, &name.as_bytes(), schema_size, lmdb::WriteFlags::empty())?;
         schema.encode_into(schema_buf)?;
 
-        for (k, attribute) in schema.attributes.iter() {
+        for (k, index) in schema.attributes.iter() {
             println!("Creating index for {:?}", k);
-            Index::create(&mut txn, db, &attribute.index).ok();
+            Index::create(txn, db, index).ok();
             println!("index {:?} created", k);
         }
 
@@ -83,33 +78,31 @@ impl<'env> Database<'env> {
             txn.create_db(Some(roname), lmdb::DatabaseFlags::empty())?;
         }
 
-        Transaction::commit(txn)?;
-
         Ok(())
     }
 
-    pub fn insert<B>(&mut self, uuid: &UUID, entry: &EntryT<B>) -> Result<()>
+    pub fn insert<B>(&mut self, txn: &mut RwTransaction, uuid: &UUID, entry: &EntryT<B>) -> Result<()>
         where B: Serialize + AsRef<[u8]>
     {
         // 1: Index entry
         for (key, i) in self.indices.iter_mut() {
             if let Some(val) = entry.metadata.get(key) {
-                i.index(&mut self.txn, *uuid, val)?;
+                i.index(txn, *uuid, val)?;
             }
         }
 
         // 2: Insert into entry db
-        self.entries.put(&mut self.txn, uuid, entry)?;
+        self.entries.put(txn, uuid, entry)?;
 
         Ok(())
     }
 
-    pub fn dump(&mut self) -> Result<()> {
-        self.entries.list(&self.txn)?;
+    pub fn dump(&self, txn: &RoTransaction) -> Result<()> {
+        self.entries.list(txn)?;
         println!("Indices:\n==============================");
         for (k, db) in self.indices.iter() {
             println!("{:?}:\n", k);
-            db.list(&self.txn)?;
+            db.list(txn)?;
         }
         Ok(())
     }
@@ -143,7 +136,7 @@ impl<'env> Database<'env> {
         Ok(())
     }
 
-    pub fn import(&mut self, dir: &Path) -> Result<()> {
+    pub fn import(&mut self, txn: &mut RwTransaction, dir: &Path) -> Result<()> {
         let dir = dir.join("entries/");
         println!("Reading dir: {:?}", dir);
         let entries = fs::read_dir(dir)?;
@@ -167,17 +160,12 @@ impl<'env> Database<'env> {
                 fp.read_to_end(&mut buf)?;
                 let e = entry::from_yaml(&buf)?;
 
-                self.insert(&u, &e)?;
+                self.insert(txn, &u, &e)?;
 
                 println!("Imported {}", u.as_uuid());
             }
         }
 
-        Ok(())
-    }
-
-    pub fn close(self) -> Result<()> {
-        self.txn.commit()?;
         Ok(())
     }
 }

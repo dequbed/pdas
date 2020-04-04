@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::ops::Bound;
 use std::convert::TryInto;
 
-use lmdb::Transaction;
+pub use lmdb::Transaction;
 
 use nom::{
     IResult,
@@ -63,12 +63,12 @@ pub struct Query {
 }
 
 pub struct Querier<'env, T> {
-    txn: T,
-    db: &'env Database<'env>,
+    txn: &'env T,
+    db: &'env Database,
 }
 
 impl<'env, T: Transaction> Querier<'env, T> {
-    pub fn new(txn: T, db: &'env Database<'env>) -> Self {
+    pub fn new(txn: &'env T, db: &'env Database) -> Self {
         Self { txn, db }
     }
     pub fn run(&mut self, query: Query) -> Result<HashSet<UUID>> {
@@ -113,7 +113,7 @@ impl<'env, T: Transaction> Querier<'env, T> {
                     Ok(db.map.range((lower,upper)).map(|(_,u)| *u).collect())
                 }
                 (Index::Term(db), Filter::TermExists(ref term)) => {
-                    db.get(&self.txn, &term).map(|m| m.into_set())
+                    db.get(self.txn, &term).map(|m| m.into_set())
                 }
                 _ => Err(Error::QueryType),
             }
@@ -125,7 +125,7 @@ impl<'env, T: Transaction> Querier<'env, T> {
     }
 
     pub fn all(&mut self) -> Result<HashSet<UUID>> {
-        let i = self.db.entries.iter_start(&self.txn)?;
+        let i = self.db.entries.iter_start(self.txn)?;
         i.map(|r| {
             let (b,_) = r?;
             let (int_bytes, _rest) = b.split_at(std::mem::size_of::<u128>());
