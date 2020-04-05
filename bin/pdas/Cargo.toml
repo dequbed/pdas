@@ -19,5 +19,7 @@ git-annex = { path = "../../lib/annex" }
 
 tempfile = "*"
 
+serde_json = "1.0"
+
 [dev-dependencies]
 maplit = "1.0"

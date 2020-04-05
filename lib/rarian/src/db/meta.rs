@@ -11,19 +11,27 @@ use crate::error::{Result, Error};
 //pub type Metakey = u32;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Metakey {
-    Date,
     Title,
-    Description,
     Artist,
+    Date,
+    Comment,
+    Description,
+    Album,
+    TrackNumber,
+    Albumartist,
 }
 
 impl Metakey {
     pub fn from_str(s: &str) -> Result<Metakey> {
         match s {
-            "date" => Ok(Metakey::Date),
             "title" => Ok(Metakey::Title),
-            "description" => Ok(Metakey::Description),
             "artist" => Ok(Metakey::Artist),
+            "date" => Ok(Metakey::Date),
+            "comment" => Ok(Metakey::Comment),
+            "description" => Ok(Metakey::Description),
+            "album" => Ok(Metakey::Album),
+            "tracknumber" => Ok(Metakey::TrackNumber),
+            "albumartist" => Ok(Metakey::Albumartist),
             _ => Err(Error::BadMetakey)
         }
     }

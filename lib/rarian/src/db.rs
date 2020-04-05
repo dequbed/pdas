@@ -10,7 +10,7 @@ pub mod meta;
 
 use entry::EntryT;
 use crate::error::Result;
-use crate::uuid::UUID;
+pub use crate::uuid::UUID;
 use crate::schema::{Schema, IndexDescription};
 use dbm::DBManager;
 
@@ -39,7 +39,7 @@ impl<'env> Database {
         Self { entries, indices }
     }
 
-    pub fn open(txn: &RoTransaction, dbm: &'env DBManager, roname: &str) -> Result<Self> {
+    pub fn open<T: Transaction>(txn: &T, roname: &str) -> Result<Self> {
         let mut name = roname.to_string();
 
         let db = unsafe { txn.open_db(None)? };
@@ -58,10 +58,12 @@ impl<'env> Database {
         Ok(Self::new(entries, indices))
     }
 
-    pub fn create(txn: &mut RwTransaction, dbm: &'env DBManager, roname: &str, schema: Schema) -> Result<()> {
+    pub fn create(txn: &mut RwTransaction, roname: &str, schema: Schema) -> Result<()> {
         let mut name = roname.to_string();
 
-        let db = dbm.open()?;
+        let db = unsafe {
+            txn.open_db(None)?
+        };
         name.push_str("_schema");
 
         let schema_size = schema.encoded_size()? as usize;
