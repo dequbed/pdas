@@ -1,3 +1,7 @@
+use std::convert::TryInto;
+
+use crate::error::{Result, Error};
+
 use serde::{
     Deserialize,
     Serialize,
@@ -26,9 +30,20 @@ impl UUID {
     pub fn as_bytes(self) -> [u8; 16] {
         self.0.to_le_bytes()
     }
+    pub fn from_bytes(buf: &[u8]) -> Result<Self> {
+        let (int_bytes, _rest) = buf.split_at(std::mem::size_of::<u128>());
+        // This can fail if for some reason entrydb keys are less than 16 bytes long.
+        // In that case we don't have any idea how to handle or export that entry. Just
+        // give up.
+        Ok(Self::from_u128(u128::from_le_bytes(int_bytes.try_into().map_err(|_| Error::MalformedUUID)?)))
+    }
 
     pub fn parse_str(input: &str) -> crate::error::Result<UUID> {
         let u = Uuid::parse_str(input)?;
         Ok(Self::new(u))
+    }
+
+    pub const fn encoded_size(&self) -> usize {
+        16
     }
 }

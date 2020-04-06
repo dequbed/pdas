@@ -4,6 +4,8 @@ pub mod term;
 pub use term::TermDB;
 pub mod range;
 pub use range::RangeDB;
+pub mod filekey;
+pub use filekey::FilekeyDB;
 
 pub mod dbm;
 pub mod meta;
@@ -31,22 +33,28 @@ use std::io::{Read, Write};
 /// Main DB type, keeps track of entries and indices
 pub struct Database {
     pub entries: EntryDB,
+    pub filekeys: FilekeyDB,
     pub indices: HashMap<meta::Metakey, Index>,
 }
 
 impl<'env> Database {
-    fn new(entries: EntryDB, indices: HashMap<meta::Metakey, Index>) -> Self {
-        Self { entries, indices }
+    fn new(entries: EntryDB, indices: HashMap<meta::Metakey, Index>, filekeys: FilekeyDB) -> Self {
+        Self { entries, indices, filekeys }
     }
 
     pub fn open<T: Transaction>(txn: &T, roname: &str) -> Result<Self> {
         let mut name = roname.to_string();
+        let len = name.len();
 
         let db = unsafe { txn.open_db(None)? };
         name.push_str("_schema");
 
         let b = txn.get(db, &name.as_bytes())?;
         let schema = Schema::decode(b)?;
+
+        name.replace_range(len.., "_filekeys");
+        let db = unsafe { txn.open_db(Some(&name))? };
+        let filekeys = FilekeyDB::new(db);
 
         let indices: HashMap<meta::Metakey, Index> = schema.attributes.iter()
             .filter_map(|(k,a)| Index::construct(txn, db, a).ok().map(|x| (*k,x)))
@@ -55,11 +63,12 @@ impl<'env> Database {
         let entries = unsafe { txn.open_db(Some(roname))? };
         let entries = EntryDB::new(entries);
 
-        Ok(Self::new(entries, indices))
+        Ok(Self::new(entries, indices, filekeys))
     }
 
     pub fn create(txn: &mut RwTransaction, roname: &str, schema: Schema) -> Result<()> {
         let mut name = roname.to_string();
+        let len = name.len();
 
         let db = unsafe {
             txn.open_db(None)?
@@ -69,6 +78,11 @@ impl<'env> Database {
         let schema_size = schema.encoded_size()? as usize;
         let schema_buf = txn.reserve(db, &name.as_bytes(), schema_size, lmdb::WriteFlags::empty())?;
         schema.encode_into(schema_buf)?;
+
+        name.replace_range(len.., "_filekeys");
+        unsafe {
+            txn.create_db(Some(&name), lmdb::DatabaseFlags::empty())?;
+        }
 
         for (k, index) in schema.attributes.iter() {
             println!("Creating index for {:?}", k);
@@ -93,8 +107,11 @@ impl<'env> Database {
             }
         }
 
-        // 2: Insert into entry db
+        // 2: Insert into entry & filkey db
         self.entries.put(txn, uuid, entry)?;
+        for file in entry.files.iter() {
+            self.filekeys.put(txn, &file.key, uuid)?;
+        }
 
         Ok(())
     }

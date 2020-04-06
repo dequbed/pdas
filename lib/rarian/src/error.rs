@@ -14,6 +14,7 @@ pub enum Error {
     Yaml(serde_yaml::Error),
     Utf8(str::Utf8Error),
     UUID(uuid::Error),
+    MalformedUUID,
     QueryType,
     QueryIterating,
     QueryUnbalanced,

@@ -30,7 +30,7 @@ use crate::db::meta::Metakey;
 use crate::error::{Result, Error};
 use crate::uuid::{UUID, Uuid};
 
-type FileKey = String;
+pub type FileKey = String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum FormatKey {
@@ -44,8 +44,8 @@ pub enum FormatKey {
 /// Important: This struct has custom `Eq` and `Hash` behaviour in that only the key will be
 /// considered, format metadata is ignored.
 pub struct FileT<B> {
-    key: FileKey,
-    format: HashMap<FormatKey, B>,
+    pub key: FileKey,
+    pub format: HashMap<FormatKey, B>,
 }
 impl<B> PartialEq for FileT<B> {
     fn eq(&self, other: &Self) -> bool {
