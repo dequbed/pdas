@@ -67,7 +67,6 @@ pub fn import<'a, I: Iterator<Item=&'a Path>>(dir: &Path, paths: I) -> Result<Ve
 }
 
 
-
 // Import process
 // 1. Check if the file is already annexed, if so => SKIP
 // 1.1 git-annex calckey

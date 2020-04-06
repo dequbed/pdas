@@ -61,13 +61,15 @@ use futures::io::{
     AllowStdIo,
 };
 
-use json;
+use serde_json;
 
-use crate::annex::Annex;
+use crate::annex::CommandOutput;
 
 type Key = String;
 type File = String;
-type AddResult = std::result::Result<(Key, File), String>;
+
+type AddError = String;
+type AddResult = std::result::Result<(Key, File), AddError>;
 
 /// Add files to annex. Equivalent to `git-annex add`
 ///
@@ -92,7 +94,7 @@ pub fn add(files: impl Stream<Item=String>)
 pub fn add_opt(files: impl Stream<Item=String>, include_dotfiles: bool, force: bool, update: bool) 
     -> (impl Future<Output=Result<(), io::Error>>, Result<impl Stream<Item=AddResult>, std::io::Error>)
 {
-    let mut args = Vec::new();
+    let mut args = Vec::with_capacity(3);
     if include_dotfiles {
         args.push("--include-dotfiles");
     }
@@ -130,10 +132,14 @@ pub fn add_opt(files: impl Stream<Item=String>, include_dotfiles: bool, force: b
     (f, Ok(stdout_l
         .filter_map(|l| futures::future::ready(l.ok()))
         .map(|l| {
-            let mut j = json::parse(&l).unwrap();
+            if !l.is_empty() {
+                let output: CommandOutput = serde_json::from_str(&l).unwrap();
 
-            let k: String = j.remove("key").take_string().unwrap();
-            let f: String = j.remove("file").take_string().unwrap();
-            Ok((k,f))
+                let k: String = output.key.to_string();
+                let f: String = output.file.to_string();
+                Ok((k,f))
+            } else {
+                Err("File existed already".to_string())
+            }
         })))
 }
