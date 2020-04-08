@@ -37,7 +37,9 @@ pub async fn import(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
         }
     };
 
-    if let Err(e) = db.import(txn, entries) {
+    let entries = PathBuf::from(entries.to_string());
+
+    if let Err(e) = db.import(&mut txn, &entries) {
         error!(log, "Failed to import entries: {:?}", e);
     }
 

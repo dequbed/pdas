@@ -37,7 +37,9 @@ pub async fn export(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
         }
     };
 
-    if let Err(e) = db.export_with(entries, txn) {
+    let entries = PathBuf::from(entries.to_string());
+
+    if let Err(e) = db.export_with(&entries, &txn) {
         error!(log, "Failed to export entries: {:?}", e);
     }
 
