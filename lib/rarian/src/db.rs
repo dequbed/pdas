@@ -105,8 +105,7 @@ impl<'env> Database {
         self.insert(txn, uuid, entry)
     }
 
-    pub fn insert(&mut self, txn: &mut RwTransaction, uuid: UUID, entry: &EntryT) -> Result<()>
-    {
+    pub fn insert(&mut self, txn: &mut RwTransaction, uuid: UUID, entry: &EntryT) -> Result<()> {
         // 1: Check if unique
         let mut other: Option<UUID> = None;
         for fk in entry.files.iter() {
@@ -123,9 +122,13 @@ impl<'env> Database {
         }
 
         if let Some(u) = other {
-            return self.merge(txn, u, entry);
+            self.merge(txn, u, entry)
+        } else {
+            self.insert_raw(txn, uuid, entry)
         }
+    }
 
+    pub fn insert_raw(&mut self, txn: &mut RwTransaction, uuid: UUID, entry: &EntryT) -> Result<()> {
         // 2: Index entry
         for (key, i) in self.indices.iter_mut() {
             if let Some(val) = entry.metadata.get(key) {
@@ -142,9 +145,10 @@ impl<'env> Database {
         Ok(())
     }
 
-    // TODO: Implement this ^^'
+    // TODO: Implement this properly ^^'
     fn merge(&mut self, txn: &mut RwTransaction, other: UUID, entry: &EntryT) -> Result<()> {
-        unimplemented!();
+        // FIXME currently this just overwrites the existing one.
+        self.insert_raw(txn, other, entry)
     }
 
     pub fn dump(&self, txn: &RoTransaction) -> Result<()> {
