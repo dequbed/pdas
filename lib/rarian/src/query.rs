@@ -113,7 +113,7 @@ impl<'env, T: Transaction> Querier<'env, T> {
                     Ok(db.map.range((lower,upper)).map(|(_,u)| *u).collect())
                 }
                 (Index::Term(db), Filter::TermExists(ref term)) => {
-                    db.get(self.txn, &term).map(|m| m.into_set())
+                    db.lookup(self.txn, &term).map(|m| m.into_set())
                 }
                 _ => Err(Error::QueryType),
             }

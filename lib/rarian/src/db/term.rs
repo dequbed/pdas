@@ -171,6 +171,13 @@ impl TermDB {
 
         Ok(())
     }
+
+    pub fn lookup<'txn, T: Transaction>(&self, txn: &'txn T, term: &str) -> Result<Matches> {
+        let s = Stemmer::create(Algorithm::English);
+        let stem = s.stem(term);
+
+        self.get(txn, &stem)
+    }
 }
 
 lazy_static! {
