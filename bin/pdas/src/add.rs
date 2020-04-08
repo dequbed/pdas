@@ -97,18 +97,16 @@ fn run_exiftool(file: String) -> Result<Exiftag, String> {
 
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
-enum MaybeStringMaybeArray {
-    String(Box<str>),
-    Array(Vec<Box<str>>),
-    Nothing,
+enum MaybeValueMaybeArray<V> {
+    Value(V),
+    Array(Vec<V>),
 }
 
-impl MaybeStringMaybeArray {
-    fn into_iter(self) -> impl Iterator<Item=Box<str>> {
-        use MaybeStringMaybeArray::*;
+impl<V> MaybeValueMaybeArray<V> {
+    fn into_iter(self) -> impl Iterator<Item=V> {
+        use MaybeValueMaybeArray::*;
         match self {
-            Nothing => Vec::with_capacity(0).into_iter(),
-            String(s) => vec![s].into_iter(),
+            Value(s) => vec![s].into_iter(),
             Array(a) => a.into_iter(),
         }
     }
@@ -117,37 +115,43 @@ impl MaybeStringMaybeArray {
 #[derive(Debug,Deserialize)]
 struct Exiftag {
     #[serde(rename = "Title")]
-    title: MaybeStringMaybeArray,
+    title: Option<MaybeValueMaybeArray<Box<str>>>,
     #[serde(rename = "Artist")]
-    artist: MaybeStringMaybeArray,
+    artist: Option<MaybeValueMaybeArray<Box<str>>>,
     #[serde(rename = "Comment")]
-    comment: MaybeStringMaybeArray,
+    comment: Option<MaybeValueMaybeArray<Box<str>>>,
     #[serde(rename = "Album")]
-    album: MaybeStringMaybeArray,
+    album: Option<MaybeValueMaybeArray<Box<str>>>,
     #[serde(rename = "TrackNumber")]
-    tracknr: Option<i64>,
+    tracknr: Option<MaybeValueMaybeArray<i64>>,
     #[serde(rename = "Albumartist")]
-    albumartist: MaybeStringMaybeArray,
+    albumartist: Option<MaybeValueMaybeArray<Box<str>>>,
 }
 
 fn tagtometa(tag: Exiftag) -> HashMap<Metakey, Metavalue> {
     let mut metadata = HashMap::new();
-    for title in tag.title.into_iter() {
+    if !tag.title.is_none() {
+        let title = tag.title.unwrap().into_iter().collect();
         metadata.insert(Metakey::Title, Metavalue::Title(title));
     }
-    for artist in tag.artist.into_iter() {
+    if !tag.artist.is_none() {
+        let artist = tag.artist.unwrap().into_iter().collect();
         metadata.insert(Metakey::Artist, Metavalue::Artist(artist));
     }
-    for comment in tag.comment.into_iter() {
+    if !tag.comment.is_none() {
+        let comment = tag.comment.unwrap().into_iter().collect();
         metadata.insert(Metakey::Comment, Metavalue::Comment(comment));
     }
-    for album in tag.album.into_iter() {
+    if !tag.album.is_none() {
+        let album = tag.album.unwrap().into_iter().collect();
         metadata.insert(Metakey::Album, Metavalue::Album(album));
     }
-    if let Some(tracknr) = tag.tracknr {
+    if !tag.tracknr.is_none() {
+        let tracknr = tag.tracknr.unwrap().into_iter().collect();
         metadata.insert(Metakey::TrackNumber, Metavalue::TrackNumber(tracknr));
     }
-    for albumartist in tag.albumartist.into_iter() {
+    if !tag.albumartist.is_none() {
+        let albumartist = tag.albumartist.unwrap().into_iter().collect();
         metadata.insert(Metakey::Albumartist, Metavalue::Albumartist(albumartist));
     }
 
