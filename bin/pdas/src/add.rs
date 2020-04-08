@@ -91,8 +91,6 @@ fn run_exiftool(file: String) -> Result<Exiftag, String> {
         .output()
         .expect("Failed to execute command");
 
-    println!("{:?}", std::str::from_utf8(&output.stdout[..]));
-
     let mut r: Vec<Exiftag> = serde_json::from_slice(output.stdout.as_slice()).map_err(|e| format!("{:?}", e))?;
     Ok(r.pop().unwrap())
 }
