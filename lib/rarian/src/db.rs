@@ -177,7 +177,7 @@ impl<'env> Database {
                     UUID::from_u128(u)
                 };
 
-                let mut p = Path::join(&dir, "entries/");
+                let mut p = dir.to_path_buf();
                 fs::create_dir_all(&p)?;
                 p.push(format!("{}.yaml", u.as_uuid()));
                 let mut fp = File::create(&p)?;

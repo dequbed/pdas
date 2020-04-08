@@ -2,6 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::marker::PhantomData;
 use std::iter::FromIterator;
 
+use std::fmt;
+
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::convert::TryInto;
@@ -80,6 +82,12 @@ impl FileT {
     }
 }
 
+impl fmt::Display for FileT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "File {}", self.key)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 /// A metadata entry
 ///
@@ -127,6 +135,21 @@ impl EntryT {
 
 pub fn from_yaml(s: &[u8]) -> std::result::Result<EntryT, serde_yaml::Error> {
     serde_yaml::from_slice(s)
+}
+
+impl fmt::Display for EntryT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Entry\n")?;
+        for file in self.files.iter() {
+            write!(f, "\t\t{}\n", file)?;
+        }
+        write!(f, "\tMetadata:\n")?;
+        for meta in self.metadata.values() {
+            write!(f, "\t\t{}\n", meta)?;
+        }
+
+        Ok(())
+    }
 }
 
 #[derive(Copy, Clone)]
