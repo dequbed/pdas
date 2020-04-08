@@ -29,7 +29,7 @@ fn main() {
         (@subcommand query =>
             (about: "Query the database")
             (@arg target: -t --target env("TARGET") +required "The target database")
-            (@arg query: "The query to run")
+            (@arg query: ... "The query to run")
             )
     ).get_matches();
 
@@ -54,9 +54,11 @@ fn main() {
         s.set_loglevel(Level::Info);
     }
 
+    debug!(log, "Settings: {:?}", s);
+
     match m.subcommand() {
-        ("add", Some(m)) => add(m),
-        ("query", Some(m)) => query(m),
+        ("add", Some(m)) => add(log, s, m),
+        ("query", Some(m)) => query(log, s, m),
         (subcmd, _) => {
             crit!(log, "Unknown subcommand {}.", subcmd);
             exit(log, -2);
@@ -64,7 +66,7 @@ fn main() {
     }
 }
 
-// Exit but flush the logger properly
+// std::process::exit but flush the logger properly
 fn exit(log: slog::Logger, code: i32) -> ! {
     std::mem::drop(log);
     std::process::exit(code)

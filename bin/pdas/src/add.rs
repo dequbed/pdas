@@ -1,58 +1,16 @@
-use std::path::Path;
-use std::io::Read;
-use std::io;
-use std::fs;
 use std::collections::{HashMap, HashSet};
 
 use clap;
+use slog::Logger;
 
 use serde::Deserialize;
 
-
-use rarian::schema::Schema;
-use rarian::query::Transaction;
-use rarian::db::dbm::{self, DBManager};
-use rarian::db::{Database, UUID};
+use rarian::db::entry::EntryOwn;
 use rarian::db::meta::Metakey;
-use rarian::db::entry::{EntryOwn, EntryT};
-use rarian::query::Querier;
 
-pub fn add(m: &clap::ArgMatches) {
+use crate::Settings;
 
-    let dbdir = Path::new("/tmp/asdf");
-
-    let mut dbmb = DBManager::builder();
-    dbmb.set_flags(dbm::EnvironmentFlags::MAP_ASYNC | dbm::EnvironmentFlags::WRITE_MAP);
-    dbmb.set_max_dbs(126);
-    dbmb.set_map_size(10485760);
-    let dbm = DBManager::from_builder(dbdir.as_ref(), dbmb).unwrap();
-
-    //let mut file = fs::File::open("/tmp/asdf/music.yml").unwrap();
-    //let mut buf = Vec::new();
-    //file.read_to_end(&mut buf).unwrap();
-    //let schema = Schema::from_yaml(&buf[..]).unwrap();
-
-    let mut txn = dbm.write().unwrap();
-    //Database::create(&mut wtxn, "music", schema).unwrap();
-    let mut db = Database::open(&txn, "music").unwrap();
-
-    let stdin = io::stdin();
-    let mut handle = stdin.lock();
-    let mut buffer = String::new();
-    handle.read_to_string(&mut buffer).unwrap();
-
-    // let tags: Vec<Exiftag> = serde_json::from_str(&buffer).unwrap();
-    // for tag in tags.into_iter() {
-    //     let e = tagtoentry(tag);
-    //     let uuid = UUID::generate();
-    //     db.insert(&mut txn, &uuid, &e).unwrap();
-    // }
-
-    let qr = Querier::new(&txn, &db);
-    //let q = parse("");
-
-    Transaction::commit(txn).unwrap();
-
+pub fn add(log: Logger, s: Settings, m: &clap::ArgMatches) {
 }
 
 #[derive(Debug,Deserialize)]
@@ -92,5 +50,5 @@ fn tagtoentry(tag: Exiftag) -> EntryOwn {
         metadata.insert(Metakey::Albumartist, albumartist.into_bytes().into_boxed_slice());
     }
 
-    EntryT::newv(HashSet::new(), metadata)
+    EntryOwn::newv(HashSet::new(), metadata)
 }

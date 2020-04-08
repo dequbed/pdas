@@ -6,6 +6,11 @@ use std::env;
 
 use std::path::{Path, PathBuf};
 
+fn default_loglevel() -> usize {
+    // TODO: Make that compile time const
+    slog::Level::Error.as_usize()
+}
+
 #[derive(Debug,Deserialize)]
 /// PDAS application settings
 ///
@@ -15,7 +20,8 @@ use std::path::{Path, PathBuf};
 // TODO: Make a proc macro for pulling env variables and other merging?
 pub struct Settings {
     pub databasepath: PathBuf,
-    #[serde(default)]
+
+    #[serde(default = "default_loglevel")]
     pub loglevel: usize,
 }
 
@@ -23,7 +29,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             databasepath: PathBuf::from(""),
-            loglevel: slog::Level::Error.as_usize(),
+            loglevel: default_loglevel(),
         }
     }
 }

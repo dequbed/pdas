@@ -8,6 +8,8 @@ use std::convert::TryInto;
 use std::path::Path;
 use std::hash::{Hash, Hasher};
 
+use bytes::{Bytes, BytesMut};
+
 use lmdb::{
     Database,
     Transaction,
@@ -26,7 +28,7 @@ use libc::size_t;
 
 use crate::db::dbm::DBManager;
 
-use crate::db::meta::Metakey;
+use crate::db::meta::{Metakey, Metavalue};
 use crate::error::{Result, Error};
 use crate::uuid::{UUID, Uuid};
 
@@ -76,7 +78,6 @@ impl<B: AsRef<[u8]>> FileT<B> {
     }
 }
 
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 /// A metadata entry
 ///
@@ -87,29 +88,21 @@ impl<B: AsRef<[u8]>> FileT<B> {
 pub struct EntryT<B> {
     pub files: HashSet<FileT<B>>,
     /// Metadata is an arbitrary key-value map
-    pub metadata: HashMap<Metakey, B>,
+    pub metadata: HashMap<Metakey, Metavalue>,
 }
 impl<B> EntryT<B> {
-    pub fn new(filekey: FileT<B>, metadata: HashMap<Metakey, B>) -> Self {
+    pub fn new(filekey: FileT<B>, metadata: HashMap<Metakey, Metavalue>) -> Self {
         let mut set = HashSet::new();
         set.insert(filekey);
 
         Self::newv(set, metadata)
     }
 
-    pub fn newv(files: HashSet<FileT<B>>, metadata: HashMap<Metakey, B>) -> Self {
+    pub fn newv(files: HashSet<FileT<B>>, metadata: HashMap<Metakey, Metavalue>) -> Self {
         Self {
             files,
             metadata,
         }
-    }
-
-    pub fn keys(&self) -> &HashSet<FileT<B>> {
-        &self.files
-    }
-
-    pub fn metadata(&self) -> &HashMap<Metakey, B> {
-        &self.metadata
     }
 }
 
@@ -149,7 +142,7 @@ pub fn from_yaml(s: &[u8]) -> std::result::Result<EntryOwn, serde_yaml::Error> {
 }
 
 pub type Entry<'e> = EntryT<&'e [u8]>;
-pub type EntryOwn = EntryT<Box<[u8]>>;
+pub type EntryOwn<'a> = EntryT<Box<[u8]>>;
 
 #[derive(Copy, Clone)]
 pub struct EntryDB {
