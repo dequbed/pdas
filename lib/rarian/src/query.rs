@@ -19,7 +19,7 @@ use crate::db::{
     Index,
     EntryDB,
     RangeDB,
-    entry::Entry,
+    entry::EntryT,
 };
 
 use crate::uuid::UUID;

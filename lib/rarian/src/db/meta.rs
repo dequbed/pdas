@@ -69,4 +69,17 @@ impl Metavalue {
             _ => None,
         }
     }
+
+    pub fn to_key(&self) -> Metakey {
+        match self {
+            Self::Title(_) => Metakey::Title,
+            Self::Artist(_) => Metakey::Artist,
+            Self::Date(_) => Metakey::Date,
+            Self::Comment(_) => Metakey::Comment,
+            Self::Description(_) => Metakey::Description,
+            Self::Album(_) => Metakey::Album,
+            Self::TrackNumber(_) => Metakey::TrackNumber,
+            Self::Albumartist(_) => Metakey::Albumartist,
+        }
+    }
 }

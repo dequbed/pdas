@@ -22,6 +22,9 @@ use lmdb::{
 use serde::{
     Deserialize,
     Serialize,
+    Serializer,
+    Deserializer,
+    ser::SerializeSeq,
 };
 
 use libc::size_t;
@@ -45,31 +48,30 @@ pub enum FormatKey {
 ///
 /// Important: This struct has custom `Eq` and `Hash` behaviour in that only the key will be
 /// considered, format metadata is ignored.
-pub struct FileT<B> {
+pub struct FileT {
     pub key: FileKey,
-    pub format: HashMap<FormatKey, B>,
+    pub format: HashMap<FormatKey, Box<str>>,
 }
-impl<B> PartialEq for FileT<B> {
+impl PartialEq for FileT {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key
     }
 }
-impl<B> Eq for FileT<B> {}
-impl<B> Hash for FileT<B> {
+impl Eq for FileT {}
+impl Hash for FileT {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.key.hash(state);
     }
 }
 
-impl<B> FileT<B> {
-    pub fn new(key: FileKey, format: HashMap<FormatKey, B>) -> Self {
+impl FileT {
+    pub fn new(key: FileKey, format: HashMap<FormatKey, Box<str>>) -> Self {
         Self { key, format }
     }
 }
 
-impl<B: AsRef<[u8]>> FileT<B> {
-    pub fn ref_eq<A>(&self, other: &FileT<A>) -> bool
-        where A: AsRef<[u8]>
+impl FileT {
+    pub fn ref_eq(&self, other: &FileT) -> bool
     {
         self.key == other.key &&
             std::iter::Iterator::eq(
@@ -85,38 +87,31 @@ impl<B: AsRef<[u8]>> FileT<B> {
 /// semantically same file although its actual bits may be different. For example the same song
 /// encoded with FLAC and ogg/vorbis should be the same entry, and the same song but with
 /// Vorbis comments or ID3 tags attached / not attached should be the same entry.
-pub struct EntryT<B> {
-    pub files: HashSet<FileT<B>>,
+pub struct EntryT {
+    pub files: HashSet<FileT>,
     /// Metadata is an arbitrary key-value map
+    #[serde(serialize_with = "map_to_list", deserialize_with = "list_to_map") ]
     pub metadata: HashMap<Metakey, Metavalue>,
 }
-impl<B> EntryT<B> {
-    pub fn new(filekey: FileT<B>, metadata: HashMap<Metakey, Metavalue>) -> Self {
+impl EntryT {
+    pub fn new(filekey: FileT, metadata: HashMap<Metakey, Metavalue>) -> Self {
         let mut set = HashSet::new();
         set.insert(filekey);
 
         Self::newv(set, metadata)
     }
 
-    pub fn newv(files: HashSet<FileT<B>>, metadata: HashMap<Metakey, Metavalue>) -> Self {
+    pub fn newv(files: HashSet<FileT>, metadata: HashMap<Metakey, Metavalue>) -> Self {
         Self {
             files,
             metadata,
         }
     }
-}
 
-impl<'e, B> EntryT<B>
-    where B: Deserialize<'e>,
-{
-    pub fn decode(bytes: &'e [u8]) -> Result<Self> {
+    pub fn decode(bytes: &[u8]) -> Result<Self> {
         bincode::deserialize(bytes).map_err(Error::Bincode)
     }
-}
 
-impl<'e, B> EntryT<B>
-    where B: Serialize
-{
     pub fn encode_into(&self, bytes: &mut [u8]) -> Result<()> {
         bincode::serialize_into(bytes, &self).map_err(Error::Bincode)
     }
@@ -130,19 +125,16 @@ impl<'e, B> EntryT<B>
     }
 }
 
-impl<B: Eq> PartialEq for EntryT<B> {
+impl PartialEq for EntryT {
     fn eq(&self, other: &Self) -> bool {
         self.files == other.files && 
             std::iter::Iterator::eq(self.metadata.iter(), other.metadata.iter())
     }
 }
 
-pub fn from_yaml(s: &[u8]) -> std::result::Result<EntryOwn, serde_yaml::Error> {
+pub fn from_yaml(s: &[u8]) -> std::result::Result<EntryT, serde_yaml::Error> {
     serde_yaml::from_slice(s)
 }
-
-pub type Entry<'e> = EntryT<&'e [u8]>;
-pub type EntryOwn = EntryT<Box<[u8]>>;
 
 #[derive(Copy, Clone)]
 pub struct EntryDB {
@@ -167,16 +159,15 @@ impl EntryDB {
         txn.reserve(self.db, key, len as size_t, flags).map_err(Error::LMDB)
     }
 
-    pub fn put<'txn, B>(self, txn: &mut RwTransaction, key: &UUID, e: &EntryT<B>) -> Result<()>
-        where B: Serialize
+    pub fn put<'txn>(self, txn: &mut RwTransaction, key: &UUID, e: &EntryT) -> Result<()>
     {
         let len = e.encoded_size()? as usize;
         let buf = self.reserve_bytes(txn, &key.as_bytes(), len, WriteFlags::empty())?;
         e.encode_into(buf)
     }
 
-    pub fn get<'txn, T: Transaction>(self, txn: &'txn T, key: &UUID) -> Result<Entry<'txn>> {
-        self.get_bytes(txn, &key.as_bytes()).and_then(Entry::decode)
+    pub fn get<'txn, T: Transaction>(self, txn: &'txn T, key: &UUID) -> Result<EntryT> {
+        self.get_bytes(txn, &key.as_bytes()).and_then(EntryT::decode)
     }
 
     pub fn iter_start<'txn, T: Transaction>(self, txn: &'txn T) -> Result<Iter<'txn>> {
@@ -189,7 +180,7 @@ impl EntryDB {
 
         for r in i {
             if let Ok((k,v)) = r {
-                let e = Entry::decode(v)?;
+                let e = EntryT::decode(v)?;
                 let u = {
                     let (int_bytes, _rest) = k.split_at(std::mem::size_of::<u128>());
                     // This can fail if for some reason entrydb keys are less than 16 bytes long.
@@ -205,6 +196,24 @@ impl EntryDB {
 
         Ok(())
     }
+}
+
+fn list_to_map<'de, D: Deserializer<'de>>(deserializer: D) -> std::result::Result<HashMap<Metakey, Metavalue>, D::Error> {
+    let mut map = HashMap::new();
+    let v = Vec::<Metavalue>::deserialize(deserializer)?;
+    for value in v {
+        map.insert(value.to_key(), value);
+    }
+
+    Ok(map)
+}
+fn map_to_list<S: Serializer>(map: &HashMap<Metakey, Metavalue>, serializer: S) -> std::result::Result<S::Ok, S::Error>{
+    let list: Vec<Metavalue> = map.values().map(|v| v.clone()).collect();
+    let mut seq = serializer.serialize_seq(Some(list.len()))?;
+    for element in list.iter() {
+        seq.serialize_element(&element)?;
+    }
+    seq.end()
 }
 
 #[cfg(test)]

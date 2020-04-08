@@ -97,8 +97,7 @@ impl<'env> Database {
         Ok(())
     }
 
-    pub fn insert<B>(&mut self, txn: &mut RwTransaction, uuid: &UUID, entry: &EntryT<B>) -> Result<()>
-        where B: Serialize + AsRef<[u8]>
+    pub fn insert(&mut self, txn: &mut RwTransaction, uuid: &UUID, entry: &EntryT) -> Result<()>
     {
         // 1: Index entry
         for (key, i) in self.indices.iter_mut() {
@@ -131,7 +130,7 @@ impl<'env> Database {
 
         for r in i {
             if let Ok((k,v)) = r {
-                let e = entry::Entry::decode(v)?;
+                let e = entry::EntryT::decode(v)?;
                 let u = {
                     let (int_bytes, _rest) = k.split_at(std::mem::size_of::<u128>());
                     // This can fail if for some reason entrydb keys are less than 16 bytes long.
