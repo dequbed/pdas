@@ -80,7 +80,7 @@ impl FileT {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 /// A metadata entry
 ///
 /// Each entry connects a metadata map to a set of filekeys. All filekey should identifiy the
@@ -122,13 +122,6 @@ impl EntryT {
 
     pub fn to_yaml(&self) -> std::result::Result<String, serde_yaml::Error> {
         serde_yaml::to_string(self)
-    }
-}
-
-impl PartialEq for EntryT {
-    fn eq(&self, other: &Self) -> bool {
-        self.files == other.files && 
-            std::iter::Iterator::eq(self.metadata.iter(), other.metadata.iter())
     }
 }
 
@@ -221,9 +214,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn uuid_cast() {
-        let uuid_1 = UUID::generate();
-        let uuid_i = uuid_1.as_uuid();
-        assert_eq!(uuid_1, UUID::new(uuid_i));
+    fn encode_decode() {
+        let mut files = HashSet::new();
+        let mut format = HashMap::new();
+        format.insert(FormatKey::MimeType, "audio/flac".to_string().into_boxed_str());
+        files.insert(FileT {
+            key: "SHA256E-s5338457--d2d5872da46b4a70bda0de855a0d5250bb01e89d52b5e751f1fc685ee4e064f2.flac".to_string(),
+            format: format,
+        });
+
+        let mut metadata = HashMap::new();
+        metadata.insert(Metakey::Title, Metavalue::Title("Leviathan".to_string().into_boxed_str()));
+        metadata.insert(Metakey::Artist, Metavalue::Artist("blinch".to_string().into_boxed_str()));
+        metadata.insert(Metakey::TrackNumber, Metavalue::TrackNumber(20));
+
+        let e = EntryT::newv(files, metadata);
+
+        let ymlstr = e.to_yaml().expect("Failed to *encode*");
+        let e2 = from_yaml(ymlstr.as_bytes()).expect("Failed to *decode*");
+
+        assert_eq!(e, e2);
     }
 }
