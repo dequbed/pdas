@@ -21,6 +21,7 @@ pub enum Error {
     QueryUnexpectedEOS,
     QueryBadInt(std::num::ParseIntError),
     BadMetakey,
+    TypeError,
 }
 
 impl From<bincode::Error> for Error {

@@ -11,7 +11,7 @@ pub mod dbm;
 pub mod meta;
 
 use entry::EntryT;
-use crate::error::Result;
+use crate::error::{Result, Error};
 pub use crate::uuid::UUID;
 use crate::schema::{Schema, IndexDescription};
 use dbm::DBManager;
@@ -197,16 +197,15 @@ pub enum Index {
 
 impl Index {
     #[inline]
-    pub fn index<B: AsRef<[u8]>>(&mut self, txn: &mut RwTransaction, uuid: UUID, entry_v: &B) -> Result<()> {
+    pub fn index(&mut self, txn: &mut RwTransaction, uuid: UUID, entry_v: &meta::Metavalue) -> Result<()> {
         match self {
             Self::IntMap(db) => {
-                let (bytes, _rest) = entry_v.as_ref().split_at(std::mem::size_of::<u64>());
-                let value = u64::from_le_bytes(bytes.try_into().unwrap());
+                let value = entry_v.to_int().ok_or(Error::TypeError)?;
                 db.index(txn, value, uuid)
             },
             Self::Term(db) => {
-                let term = String::from_utf8(entry_v.as_ref().to_vec())?;
-                db.index(txn, term, uuid)
+                let term = entry_v.to_str().ok_or(Error::TypeError)?;
+                db.index(txn, term.to_string(), uuid)
             }
         }
     }

@@ -37,13 +37,36 @@ impl Metakey {
     }
 }
 
-
-pub trait Metavalue<'de> {
-    fn decode(bytes: &'de [u8]) -> Self;
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum Metavalue {
+    Title(Box<str>),
+    Artist(Box<str>),
+    Date(i64),
+    Comment(Box<str>),
+    Description(Box<str>),
+    Album(Box<str>),
+    TrackNumber(i64),
+    Albumartist(Box<str>),
 }
 
-impl<'de> Metavalue<'de> for &'de str {
-    fn decode(bytes: &'de [u8]) -> Self {
-        unsafe { std::str::from_utf8_unchecked(bytes) }
+impl Metavalue {
+    pub fn to_int(&self) -> Option<i64> {
+        match self {
+            Self::Date(i) => Some(*i),
+            Self::TrackNumber(i) => Some(*i),
+            _ => None
+        }
+    }
+
+    pub fn to_str(&self) -> Option<&str> {
+        match self {
+            Self::Title(s) => Some(&s),
+            Self::Artist(s) => Some(&s),
+            Self::Comment(s) => Some(&s),
+            Self::Description(s) => Some(&s),
+            Self::Album(s) => Some(&s),
+            Self::Albumartist(s) => Some(&s),
+            _ => None,
+        }
     }
 }

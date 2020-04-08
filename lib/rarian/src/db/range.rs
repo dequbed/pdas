@@ -14,18 +14,18 @@ use crate::error::{Result, Error};
 pub struct RangeDB {
     db: lmdb::Database,
     name: String,
-    pub map: BTreeMap<u64, UUID>,
+    pub map: BTreeMap<i64, UUID>,
 }
 
 impl RangeDB {
-    pub fn new(db: lmdb::Database, name: String, map: BTreeMap<u64, UUID>) -> Self {
+    pub fn new(db: lmdb::Database, name: String, map: BTreeMap<i64, UUID>) -> Self {
         Self { db, name, map }
     }
-    pub fn range<R: RangeBounds<u64>>(&self, r: R) -> impl Iterator<Item = (&u64, &UUID)> {
+    pub fn range<R: RangeBounds<i64>>(&self, r: R) -> impl Iterator<Item = (&i64, &UUID)> {
         self.map.range(r)
     }
 
-    pub fn decode(bytes: &[u8]) -> Result<BTreeMap<u64, UUID>> {
+    pub fn decode(bytes: &[u8]) -> Result<BTreeMap<i64, UUID>> {
         bincode::deserialize(bytes).map_err(Error::Bincode)
     }
 
@@ -45,7 +45,7 @@ impl RangeDB {
         bincode::serialize_into(bytes, &BTreeMap::<u64, UUID>::new()).map_err(Error::Bincode)
     }
 
-    pub fn index(&mut self, txn: &mut lmdb::RwTransaction, value: u64, uuid: UUID) -> Result<()> {
+    pub fn index(&mut self, txn: &mut lmdb::RwTransaction, value: i64, uuid: UUID) -> Result<()> {
         self.map.insert(value, uuid);
         let size = self.encoded_size()? as usize;
         let bytes = txn.reserve(self.db, &self.name.as_bytes(), size, lmdb::WriteFlags::empty())?;

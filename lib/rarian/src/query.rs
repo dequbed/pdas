@@ -44,7 +44,7 @@ use crate::db::dbm::{
 #[derive(Clone,Debug,PartialEq,Eq)]
 pub enum Filter {
     TermExists(String),
-    IntInRange(Bound<u64>, Bound<u64>),
+    IntInRange(Bound<i64>, Bound<i64>),
 }
 
 pub type Target = Metakey;
