@@ -239,14 +239,17 @@ impl Index {
     pub fn index(&mut self, txn: &mut RwTransaction, uuid: UUID, entry_v: &meta::Metavalue) -> Result<()> {
         match self {
             Self::IntMap(db) => {
-                let value = entry_v.to_int().ok_or(Error::TypeError)?;
-                db.index(txn, value, uuid)
+                for value in entry_v.to_int() {
+                    db.index(txn, *value, uuid)?;
+                }
             },
             Self::Term(db) => {
-                let term = entry_v.to_str().ok_or(Error::TypeError)?;
-                db.index(txn, term.to_string(), uuid)
+                for term in entry_v.to_str() {
+                    db.index(txn, term.to_string(), uuid)?;
+                }
             }
         }
+        Ok(())
     }
 
     #[inline]

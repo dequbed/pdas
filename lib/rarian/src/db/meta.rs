@@ -39,34 +39,34 @@ impl Metakey {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Metavalue {
-    Title(Box<str>),
-    Artist(Box<str>),
-    Date(i64),
-    Comment(Box<str>),
-    Description(Box<str>),
-    Album(Box<str>),
-    TrackNumber(i64),
-    Albumartist(Box<str>),
+    Title(Box<[Box<str>]>),
+    Artist(Box<[Box<str>]>),
+    Date(Box<[i64]>),
+    Comment(Box<[Box<str>]>),
+    Description(Box<[Box<str>]>),
+    Album(Box<[Box<str>]>),
+    TrackNumber(Box<[i64]>),
+    Albumartist(Box<[Box<str>]>),
 }
 
 impl Metavalue {
-    pub fn to_int(&self) -> Option<i64> {
+    pub fn to_int(&self) -> impl Iterator<Item=&i64> {
         match self {
-            Self::Date(i) => Some(*i),
-            Self::TrackNumber(i) => Some(*i),
-            _ => None
+            Self::Date(i) => i.iter(),
+            Self::TrackNumber(i) => i.iter(),
+            _ => [].iter(),
         }
     }
 
-    pub fn to_str(&self) -> Option<&str> {
+    pub fn to_str(&self) -> impl Iterator<Item=&Box<str>> {
         match self {
-            Self::Title(s) => Some(&s),
-            Self::Artist(s) => Some(&s),
-            Self::Comment(s) => Some(&s),
-            Self::Description(s) => Some(&s),
-            Self::Album(s) => Some(&s),
-            Self::Albumartist(s) => Some(&s),
-            _ => None,
+            Self::Title(s) => s.iter(),
+            Self::Artist(s) => s.iter(),
+            Self::Comment(s) => s.iter(),
+            Self::Description(s) => s.iter(),
+            Self::Album(s) => s.iter(),
+            Self::Albumartist(s) => s.iter(),
+            _ => [].iter(),
         }
     }
 
