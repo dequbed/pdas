@@ -191,7 +191,6 @@ impl<'env> Database {
     }
 
     pub fn import(&mut self, txn: &mut RwTransaction, dir: &Path) -> Result<()> {
-        let dir = dir.join("entries/");
         println!("Reading dir: {:?}", dir);
         let entries = fs::read_dir(dir)?;
 
