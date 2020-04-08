@@ -95,43 +95,59 @@ fn run_exiftool(file: String) -> Result<Exiftag, String> {
     Ok(r.pop().unwrap())
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum MaybeStringMaybeArray {
+    String(Box<str>),
+    Array(Vec<Box<str>>),
+    Nothing,
+}
+
+impl MaybeStringMaybeArray {
+    fn into_iter(self) -> impl Iterator<Item=Box<str>> {
+        use MaybeStringMaybeArray::*;
+        match self {
+            Nothing => Vec::with_capacity(0).into_iter(),
+            String(s) => vec![s].into_iter(),
+            Array(a) => a.into_iter(),
+        }
+    }
+}
+
 #[derive(Debug,Deserialize)]
 struct Exiftag {
     #[serde(rename = "Title")]
-    title: Option<Box<str>>,
+    title: MaybeStringMaybeArray,
     #[serde(rename = "Artist")]
-    artist: Option<Box<str>>,
+    artist: MaybeStringMaybeArray,
     #[serde(rename = "Comment")]
-    comment: Option<Box<str>>,
+    comment: MaybeStringMaybeArray,
     #[serde(rename = "Album")]
-    album: Option<Box<str>>,
+    album: MaybeStringMaybeArray,
     #[serde(rename = "TrackNumber")]
     tracknr: Option<i64>,
     #[serde(rename = "Albumartist")]
-    albumartist: Option<Box<str>>,
-
-    #[serde(rename = "SourceFile")]
-    source_file: Option<PathBuf>,
+    albumartist: MaybeStringMaybeArray,
 }
 
 fn tagtometa(tag: Exiftag) -> HashMap<Metakey, Metavalue> {
     let mut metadata = HashMap::new();
-    if let Some(title) = tag.title {
+    for title in tag.title.into_iter() {
         metadata.insert(Metakey::Title, Metavalue::Title(title));
     }
-    if let Some(artist) = tag.artist {
+    for artist in tag.artist.into_iter() {
         metadata.insert(Metakey::Artist, Metavalue::Artist(artist));
     }
-    if let Some(comment) = tag.comment {
+    for comment in tag.comment.into_iter() {
         metadata.insert(Metakey::Comment, Metavalue::Comment(comment));
     }
-    if let Some(album) = tag.album {
+    for album in tag.album.into_iter() {
         metadata.insert(Metakey::Album, Metavalue::Album(album));
     }
     if let Some(tracknr) = tag.tracknr {
         metadata.insert(Metakey::TrackNumber, Metavalue::TrackNumber(tracknr));
     }
-    if let Some(albumartist) = tag.albumartist {
+    for albumartist in tag.albumartist.into_iter() {
         metadata.insert(Metakey::Albumartist, Metavalue::Albumartist(albumartist));
     }
 
