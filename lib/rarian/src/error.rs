@@ -22,6 +22,8 @@ pub enum Error {
     QueryBadInt(std::num::ParseIntError),
     BadMetakey,
     TypeError,
+    MergeConflict,
+    TriplicateEntry,
 }
 
 impl From<bincode::Error> for Error {

@@ -1,7 +1,11 @@
+#![feature(async_closure)]
+
 #[macro_use]
 extern crate clap;
 #[macro_use]
 extern crate slog;
+#[macro_use]
+extern crate futures;
 
 use slog::Level;
 use slog::Drain;
@@ -12,6 +16,12 @@ mod add;
 use add::add;
 mod query;
 use query::query;
+mod create;
+use create::create;
+mod dump;
+use dump::dump;
+
+use futures::executor::block_on;
 
 fn main() {
     let m = clap_app!(pdas =>
@@ -24,12 +34,21 @@ fn main() {
         (@subcommand add =>
             (about: "Add a file to git-annex and the database")
             (@arg target: -t --target env("DB") +required "The target database")
-            (@arg files: ... "Files to add")
+            (@arg files: ... +required "Files to add")
             )
         (@subcommand query =>
             (about: "Query the database")
             (@arg target: -t --target env("TARGET") +required "The target database")
             (@arg query: ... "The query to run")
+            )
+        (@subcommand create =>
+            (about: "Create a database with a schema")
+            (@arg target: -t --target env("TARGET") +required "The target database")
+            (@arg schema: -s --schema +required +takes_value "The schema file")
+            )
+        (@subcommand dump => 
+            (about: "Dump the database")
+            (@arg target: -t --target env("TARGET") +required "The target database")
             )
     ).get_matches();
 
@@ -57,8 +76,26 @@ fn main() {
     debug!(log, "Settings: {:?}", s);
 
     match m.subcommand() {
-        ("add", Some(m)) => add(log, s, m),
-        ("query", Some(m)) => query(log, s, m),
+        ("add", Some(m)) => {
+            let f = add(&log, s, m);
+            block_on(f);
+            exit(log, 0);
+        },
+        ("query", Some(m)) => {
+            let f = query(&log, s, m);
+            block_on(f);
+            exit(log, 0);
+        },
+        ("create", Some(m)) => {
+            let f = create(&log, s, m);
+            block_on(f);
+            exit(log, 0);
+        },
+        ("dump", Some(m)) => {
+            let f = dump(&log, s, m);
+            block_on(f);
+            exit(log, 0);
+        },
         (subcmd, _) => {
             crit!(log, "Unknown subcommand {}.", subcmd);
             exit(log, -2);

@@ -97,22 +97,54 @@ impl<'env> Database {
         Ok(())
     }
 
-    pub fn insert(&mut self, txn: &mut RwTransaction, uuid: &UUID, entry: &EntryT) -> Result<()>
+
+    /// Insert an unique Entry. If there is already an entry with the same filekey it will attempt
+    /// to merge but may return `Error::MergeConflict`.
+    pub fn insert_rand(&mut self, txn: &mut RwTransaction, entry: &EntryT) -> Result<()> {
+        let uuid = UUID::generate();
+        self.insert(txn, uuid, entry)
+    }
+
+    pub fn insert(&mut self, txn: &mut RwTransaction, uuid: UUID, entry: &EntryT) -> Result<()>
     {
-        // 1: Index entry
-        for (key, i) in self.indices.iter_mut() {
-            if let Some(val) = entry.metadata.get(key) {
-                i.index(txn, *uuid, val)?;
+        // 1: Check if unique
+        let mut other: Option<UUID> = None;
+        for fk in entry.files.iter() {
+            if let Ok(u) = self.filekeys.get(txn, &fk.key) {
+                // If there is already a duplicate set and it's NOT the same that's a triplicate.
+                // We can't handle those.
+                if other.is_some() && other.unwrap() != u {
+                    return Err(Error::TriplicateEntry);
+                }
+                other = Some(u);
+                // Makes the triplicate check above unnecessary
+                // break;
             }
         }
 
-        // 2: Insert into entry & filkey db
-        self.entries.put(txn, uuid, entry)?;
+        if let Some(u) = other {
+            return self.merge(txn, u, entry);
+        }
+
+        // 2: Index entry
+        for (key, i) in self.indices.iter_mut() {
+            if let Some(val) = entry.metadata.get(key) {
+                i.index(txn, uuid, val)?;
+            }
+        }
+
+        // 3: Insert into entry & filkey db
+        self.entries.put(txn, &uuid, entry)?;
         for file in entry.files.iter() {
-            self.filekeys.put(txn, &file.key, uuid)?;
+            self.filekeys.put(txn, &file.key, &uuid)?;
         }
 
         Ok(())
+    }
+
+    // TODO: Implement this ^^'
+    fn merge(&mut self, txn: &mut RwTransaction, other: UUID, entry: &EntryT) -> Result<()> {
+        unimplemented!();
     }
 
     pub fn dump(&self, txn: &RoTransaction) -> Result<()> {
@@ -178,7 +210,7 @@ impl<'env> Database {
                 fp.read_to_end(&mut buf)?;
                 let e = entry::from_yaml(&buf)?;
 
-                self.insert(txn, &u, &e)?;
+                self.insert(txn, u, &e)?;
 
                 println!("Imported {}", u.as_uuid());
             }

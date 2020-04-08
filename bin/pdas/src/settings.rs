@@ -1,8 +1,6 @@
 use serde::Deserialize;
 use config::{Config, ConfigError, File, FileSourceFile, Environment};
 use dirs;
-use std::fs::DirBuilder;
-use std::env;
 
 use std::path::{Path, PathBuf};
 

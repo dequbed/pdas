@@ -9,7 +9,7 @@ use rarian::query::parse;
 
 use crate::Settings;
 
-pub fn query(log: Logger, s: Settings, m: &ArgMatches) {
+pub async fn query(log: &Logger, s: Settings, m: &ArgMatches<'_>) {
     let target = m.value_of("target").expect("No value for `TARGET` set!");
     let query = m.value_of("query").expect("No value for `QUERY` set!");
 
