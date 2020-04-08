@@ -222,6 +222,10 @@ impl<'env> Database {
 
         Ok(())
     }
+
+    pub fn lookup<T: Transaction>(&self, txn: &T, uuid: &UUID) -> Result<EntryT> {
+        self.entries.get(txn, uuid)
+    }
 }
 
 #[derive(Debug,Clone)]

@@ -34,7 +34,9 @@ pub async fn query(log: &Logger, s: Settings, m: &ArgMatches<'_>) {
         Ok(q) => {
             match qr.run(q) {
                 Ok(matches) => {
-                    println!("{:?}", matches);
+                    for entry in matches.iter().map(|u| db.lookup(&txn, u)).filter_map(Result::ok) {
+                        println!("{}", entry);
+                    }
                 },
                 Err(e) => {
                     crit!(log, "Failed to run query: {:?}", e);
