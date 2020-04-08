@@ -20,6 +20,10 @@ mod create;
 use create::create;
 mod dump;
 use dump::dump;
+mod import;
+use import::import;
+mod export;
+use export::export;
 
 use futures::executor::block_on;
 
@@ -49,6 +53,16 @@ fn main() {
         (@subcommand dump => 
             (about: "Dump the database")
             (@arg target: -t --target env("TARGET") +required "The target database")
+            )
+        (@subcommand import =>
+            (about: "Import a directory of entries into the database")
+            (@arg target: -t --target env("TARGET") +required "The target database")
+            (@arg entries: -d --directory +required +takes_value "Directory of entries")
+            )
+        (@subcommand export =>
+            (about: "Export the database into a directory")
+            (@arg target: -t --target env("TARGET") +required "The target database")
+            (@arg entries: -d --directory +required +takes_value "Directory to export to")
             )
     ).get_matches();
 
@@ -93,6 +107,16 @@ fn main() {
         },
         ("dump", Some(m)) => {
             let f = dump(&log, s, m);
+            block_on(f);
+            exit(log, 0);
+        },
+        ("import", Some(m)) => {
+            let f = import(&log, s, m);
+            block_on(f);
+            exit(log, 0);
+        },
+        ("export", Some(m)) => {
+            let f = export(&log, s, m);
             block_on(f);
             exit(log, 0);
         },
