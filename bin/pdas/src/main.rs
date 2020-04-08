@@ -37,7 +37,7 @@ fn main() {
         (@arg QUIET: -q --quiet conflicts_with("VERBOSITY") "Be less verbose")
         (@subcommand add =>
             (about: "Add a file to git-annex and the database")
-            (@arg target: -t --target env("DB") +required "The target database")
+            (@arg target: -t --target env("TARGET") +required "The target database")
             (@arg files: ... +required "Files to add")
             )
         (@subcommand query =>
