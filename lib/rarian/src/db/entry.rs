@@ -142,7 +142,7 @@ pub fn from_yaml(s: &[u8]) -> std::result::Result<EntryOwn, serde_yaml::Error> {
 }
 
 pub type Entry<'e> = EntryT<&'e [u8]>;
-pub type EntryOwn<'a> = EntryT<Box<[u8]>>;
+pub type EntryOwn = EntryT<Box<[u8]>>;
 
 #[derive(Copy, Clone)]
 pub struct EntryDB {
