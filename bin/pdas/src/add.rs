@@ -130,28 +130,28 @@ struct Exiftag {
 
 fn tagtometa(tag: Exiftag) -> HashMap<Metakey, Metavalue> {
     let mut metadata = HashMap::new();
-    if !tag.title.is_none() {
-        let title = tag.title.unwrap().into_iter().collect();
+    if let Some(title) = tag.title {
+        let title = title.into_iter().collect();
         metadata.insert(Metakey::Title, Metavalue::Title(title));
     }
-    if !tag.artist.is_none() {
-        let artist = tag.artist.unwrap().into_iter().collect();
+    if let Some(artist) = tag.artist {
+        let artist = artist.into_iter().collect();
         metadata.insert(Metakey::Artist, Metavalue::Artist(artist));
     }
-    if !tag.comment.is_none() {
-        let comment = tag.comment.unwrap().into_iter().collect();
+    if let Some(comment) = tag.comment {
+        let comment = comment.into_iter().collect();
         metadata.insert(Metakey::Comment, Metavalue::Comment(comment));
     }
-    if !tag.album.is_none() {
-        let album = tag.album.unwrap().into_iter().collect();
+    if let Some(album) = tag.album {
+        let album = album.into_iter().collect();
         metadata.insert(Metakey::Album, Metavalue::Album(album));
     }
-    if !tag.tracknr.is_none() {
-        let tracknr = tag.tracknr.unwrap().into_iter().collect();
+    if let Some(tracknr) = tag.tracknr {
+        let tracknr = tracknr.into_iter().collect();
         metadata.insert(Metakey::TrackNumber, Metavalue::TrackNumber(tracknr));
     }
-    if !tag.albumartist.is_none() {
-        let albumartist = tag.albumartist.unwrap().into_iter().collect();
+    if let Some(albumartist) = tag.albumartist {
+        let albumartist = albumartist.into_iter().collect();
         metadata.insert(Metakey::Albumartist, Metavalue::Albumartist(albumartist));
     }
 
