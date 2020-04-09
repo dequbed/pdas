@@ -19,6 +19,7 @@ pub enum Metakey {
     Album,
     TrackNumber,
     Albumartist,
+    Author,
 }
 
 impl Metakey {
@@ -32,6 +33,7 @@ impl Metakey {
             "album" => Ok(Metakey::Album),
             "tracknumber" => Ok(Metakey::TrackNumber),
             "albumartist" => Ok(Metakey::Albumartist),
+            "author" => Ok(Metakey::Author),
             _ => Err(Error::BadMetakey)
         }
     }
@@ -47,6 +49,7 @@ pub enum Metavalue {
     Album(Box<[Box<str>]>),
     TrackNumber(Box<[i64]>),
     Albumartist(Box<[Box<str>]>),
+    Author(Box<[Box<str>]>),
 }
 
 impl Metavalue {
@@ -66,6 +69,7 @@ impl Metavalue {
             Self::Description(s) => s.iter(),
             Self::Album(s) => s.iter(),
             Self::Albumartist(s) => s.iter(),
+            Self::Author(s) => s.iter(),
             _ => [].iter(),
         }
     }
@@ -80,6 +84,7 @@ impl Metavalue {
             Self::Album(_) => Metakey::Album,
             Self::TrackNumber(_) => Metakey::TrackNumber,
             Self::Albumartist(_) => Metakey::Albumartist,
+            Self::Author(_) => Metakey::Author,
         }
     }
 }

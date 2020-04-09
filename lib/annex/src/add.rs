@@ -122,6 +122,7 @@ pub fn add_opt(files: impl Stream<Item=String>, include_dotfiles: bool, force: b
     let stdin_b = stdin_a.into_sink();
     // FIXME: Proper error handling
     let f = files
+        .map(|s| { println!("Adding {}", &s); s})
         .map(|p| Ok(p))
         .forward(stdin_b);
 

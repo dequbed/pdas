@@ -92,8 +92,10 @@ fn add_batch(log: &Logger, txn: &mut RwTransaction, db: &mut Database) {
 
             let f = f.map(|r| if let Err(e) = r { error!(log, "Failed to run git-annex: {}", e)});
 
-            let g = futures::future::join(f, f2);
-            futures::executor::block_on(g);
+            let a = async {
+                futures::join!(f, f2);
+            };
+            futures::executor::block_on(a);
         }
         (_, Err(e)) => {
             error!(log, "Could not read git-annex stdout: {}", e);
