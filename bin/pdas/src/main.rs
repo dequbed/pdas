@@ -25,6 +25,8 @@ use import::import;
 mod export;
 use export::export;
 
+mod segments;
+
 use futures::executor::block_on;
 
 fn main() {
@@ -38,32 +40,27 @@ fn main() {
         (@subcommand add =>
             (about: "Add a file to git-annex and the database")
             (@arg target: -t --target env("TARGET") +required "The target database")
-            (@arg files: ... +required "Files to add")
-            )
+            (@arg files: ... "Files to add")
+            (@arg batch: --batch -b conflicts_with("files") "Batch mode; expect files on stdin, separated by newlines"))
         (@subcommand query =>
             (about: "Query the database")
             (@arg target: -t --target env("TARGET") +required "The target database")
-            (@arg query: ... "The query to run")
-            )
+            (@arg query: ... "The query to run"))
         (@subcommand create =>
             (about: "Create a database with a schema")
             (@arg target: -t --target env("TARGET") +required "The target database")
-            (@arg schema: -s --schema +required +takes_value "The schema file")
-            )
+            (@arg schema: -s --schema +required +takes_value "The schema file"))
         (@subcommand dump => 
             (about: "Dump the database")
-            (@arg target: -t --target env("TARGET") +required "The target database")
-            )
+            (@arg target: -t --target env("TARGET") +required "The target database"))
         (@subcommand import =>
             (about: "Import a directory of entries into the database")
             (@arg target: -t --target env("TARGET") +required "The target database")
-            (@arg entries: -d --directory +required +takes_value "Directory of entries")
-            )
+            (@arg entries: -d --directory +required +takes_value "Directory of entries"))
         (@subcommand export =>
             (about: "Export the database into a directory")
             (@arg target: -t --target env("TARGET") +required "The target database")
-            (@arg entries: -d --directory +required +takes_value "Directory to export to")
-            )
+            (@arg entries: -d --directory +required +takes_value "Directory to export to"))
     ).get_matches();
 
     let decorator = slog_term::TermDecorator::new().build();
@@ -91,8 +88,7 @@ fn main() {
 
     match m.subcommand() {
         ("add", Some(m)) => {
-            let f = add(&log, s, m);
-            block_on(f);
+            add(&log, s, m);
             exit(log, 0);
         },
         ("query", Some(m)) => {

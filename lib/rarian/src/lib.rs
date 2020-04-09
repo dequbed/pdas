@@ -26,6 +26,9 @@ use db::{dbm::DBManager, EntryDB};
 use db::entry::EntryT;
 use query::Query;
 
-pub use lmdb::Transaction;
+pub use lmdb::{
+    Transaction,
+    RwTransaction,
+};
 
 use serde::{Serialize, Deserialize};

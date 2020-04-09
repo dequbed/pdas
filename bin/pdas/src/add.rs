@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-
+use std::io::{self, BufRead};
 use std::path::PathBuf;
 
 use clap;
@@ -8,19 +8,19 @@ use slog::Logger;
 use serde::Deserialize;
 
 use rarian::db::Database;
-use rarian::db::entry::{EntryT, FileT};
+use rarian::db::entry::{EntryT, FileT, FormatKey};
 use rarian::db::meta::{Metakey, Metavalue};
 use rarian::db::dbm::{self, DBManager};
+use rarian::RwTransaction;
 use rarian::Transaction;
 
 use crate::Settings;
+use crate::segments::segments;
 
 use futures::prelude::*;
 
-pub async fn add(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
+pub fn add(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
     let target = m.value_of("target").expect("No value for `TARGET` set!");
-    let files = stream::iter(m.values_of("files").expect("No files provided").map(str::to_string));
-
     let mut dbmb = DBManager::builder();
     dbmb.set_flags(dbm::EnvironmentFlags::empty());
     dbmb.set_max_dbs(126);
@@ -37,49 +37,112 @@ pub async fn add(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
         }
     };
 
-    let (f, r) = git_annex::add::add(files);
-
-    if let Err(e) = r {
-        error!(log, "Failed to run git-annex add properly: {}", e);
-        return;
-    }
-    let s = r.unwrap();
-
-    let f = f.map(async move |r| if let Err(e) = r {
-        error!(log, "annex-poll: {}", e);
-    });
-
-    let f2 = s.map(|r| match r {
-        Ok((key, file)) => {
-            let tag = run_exiftool(file)?;
-
-            let meta = tagtometa(tag);
-
-            let file = FileT { key: key, format: HashMap::new() };
-
-            Ok(EntryT::new(file, meta))
-        },
-        Err(e) => Err(e)
-    }).for_each(|r| {
-        match r {
-            Ok(entry) => {
-                // Check if dupliate
-                // Insert entry to db
-                if let Err(e) = db.insert_rand(&mut txn, &entry) {
-                    error!(log, "Insert Entry: {:?}", e);
-                }
-            }
-            Err(e) => {
-                error!(log, "Bad Entry: {}", e);
-            }
+    if m.is_present("batch") {
+        add_batch(log, &mut txn, &mut db);
+    } else {
+        if let Some(i) = m.values_of("files") {
+            let files: Vec<String> = i.map(str::to_string).collect();
+            add_files(log, &mut txn, &mut db, files);
+        } else {
+            error!(log, "No files provided");
+            return;
         }
+    };
 
-        future::ready(())
-    });
+    if let Err(e) = Transaction::commit(txn) {
+        error!(log, "Failed to commit transaction: {}", e);
+    }
+}
 
-    join!(f.await, f2);
+fn add_batch(log: &Logger, txn: &mut RwTransaction, db: &mut Database) {
+    let stdin = io::stdin();
+    let handle = stdin.lock();
 
-    Transaction::commit(txn);
+    let s = stream::iter(handle.lines().filter_map(Result::ok)).map(|mut s| { s.push('\n'); s});
+    match git_annex::add::add(s) {
+        (f, Ok(s)) => {
+            let f2 = s.for_each_concurrent(None, |r| match r {
+                Ok((key, filename)) => {
+                    match run_exiftool(filename) {
+                        Ok(mut tag) => {
+                            let mut format = HashMap::new();
+                            if let Some(mimet) = tag.mime_type.take() {
+                                format.insert(FormatKey::MimeType, mimet.into_boxed_str());
+                            }
+                            let ft = FileT { key, format };
+                            let meta = tagtometa(tag);
+
+                            let e = EntryT::new(ft, meta);
+
+                            if let Err(e) = db.insert_rand(txn, &e) {
+                                error!(log, "Could not add entry: {:?}", e);
+                            }
+                        }
+                        Err(e) => {
+                            error!(log, "Could not parse exiftool output: {}", e);
+                        }
+                    }
+                    future::ready(())
+                }
+                Err(e) => {
+                    error!(log, "Could not add a file: {}", e);
+                    future::ready(())
+                }
+            });
+
+            let f = f.map(|r| if let Err(e) = r { error!(log, "Failed to run git-annex: {}", e)});
+
+            let g = futures::future::join(f, f2);
+            futures::executor::block_on(g);
+        }
+        (_, Err(e)) => {
+            error!(log, "Could not read git-annex stdout: {}", e);
+        }
+    };
+}
+
+fn add_files(log: &Logger, txn: &mut RwTransaction, db: &mut Database, files: Vec<String>) {
+    let s = stream::iter(files.into_iter());
+    match git_annex::add::add(s) {
+        (f, Ok(s)) => {
+            let f2 = s.for_each(|r| match r {
+                Ok((key, filename)) => {
+                    match run_exiftool(filename) {
+                        Ok(mut tag) => {
+                            let mut format = HashMap::new();
+                            if let Some(mimet) = tag.mime_type.take() {
+                                format.insert(FormatKey::MimeType, mimet.into_boxed_str());
+                            }
+                            let ft = FileT { key, format };
+                            let meta = tagtometa(tag);
+
+                            let e = EntryT::new(ft, meta);
+
+                            if let Err(e) = db.insert_rand(txn, &e) {
+                                error!(log, "Could not add entry: {:?}", e);
+                            }
+                        }
+                        Err(e) => {
+                            error!(log, "Could not parse exiftool output: {}", e);
+                        }
+                    }
+                    future::ready(())
+                }
+                Err(e) => {
+                    error!(log, "Could not add a file: {}", e);
+                    future::ready(())
+                }
+            });
+
+
+            let f = f.map(|r| if let Err(e) = r { error!(log, "Failed to run git-annex: {}", e)});
+            let g = futures::future::join(f, f2);
+            futures::executor::block_on(g);
+        }
+        (_, Err(e)) => {
+            error!(log, "Could not read git-annex stdout: {}", e);
+        }
+    }
 }
 
 fn run_exiftool(file: String) -> Result<Exiftag, String> {
@@ -126,6 +189,9 @@ struct Exiftag {
     tracknr: Option<MaybeValueMaybeArray<i64>>,
     #[serde(rename = "Albumartist")]
     albumartist: Option<MaybeValueMaybeArray<Box<str>>>,
+
+    #[serde(rename = "MIMEType")]
+    mime_type: Option<String>,
 }
 
 fn tagtometa(tag: Exiftag) -> HashMap<Metakey, Metavalue> {
