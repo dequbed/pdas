@@ -35,7 +35,7 @@ fn main() {
         (about: crate_description!())
         (@arg CONFIG: -c --config +takes_value "Use a custom configuration file")
         (@arg VERBOSITY: -v --verbose ... "Be more verbose, specify multiple times")
-        (@arg QUIET: -q --quiet conflicts_with("VERBOSITY") "Be less veterbose")
+        (@arg QUIET: -q --quiet conflicts_with("VERBOSITY") "Be less verbose")
         (@subcommand add =>
             (about: "Add a file to git-annex and the database")
             (@arg target: -t --target env("TARGET") +required "The target database")
