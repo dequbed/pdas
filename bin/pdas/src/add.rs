@@ -52,6 +52,58 @@ pub fn add(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
     }
 }
 
+
+pub fn index(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) { 
+    let target = m.value_of("target").expect("No value for `TARGET` set!");
+    let mut dbmb = DBManager::builder();
+    dbmb.set_flags(dbm::EnvironmentFlags::empty());
+    dbmb.set_max_dbs(126);
+    dbmb.set_map_size(10485760);
+    let dbm = DBManager::from_builder(&s.databasepath, dbmb).unwrap();
+
+    let mut txn = dbm.write().unwrap();
+    info!(log, "Opening database {}", target);
+    let mut db = match Database::open(&txn, target) {
+        Ok(db) => db,
+        Err(e) => {
+            crit!(log, "Can't open database {}: {:?}", target, e);
+            return;
+        }
+    };
+
+    let files = m.values_of("files").expect("No value for files set!");
+    for file in files {
+        if let Some(key) = git_annex::add::calckey(file.to_string()) {
+            match run_exiftool(file.to_string()) {
+                Ok(mut tag) => {
+                    let mut format = HashMap::new();
+                    if let Some(mimet) = tag.mime_type.take() {
+                        format.insert(FormatKey::MimeType, mimet.into_boxed_str());
+                    }
+                    let ft = FileT { key, format };
+                    let meta = tagtometa(tag);
+
+                    let e = EntryT::new(ft, meta);
+
+                    if let Err(e) = db.insert_rand(&mut txn, &e) {
+                        error!(log, "Could not add entry: {:?}", e);
+                    }
+                }
+                Err(e) => {
+                    error!(log, "Could not parse exiftool output: {}", e);
+                }
+            }
+        } else {
+            error!(log, "File {} could not be found!", file);
+        }
+    }
+
+    if let Err(e) = Transaction::commit(txn) {
+        error!(log, "Failed to commit transaction: {}", e);
+    }
+}
+
+
 fn add_batch(log: &Logger, txn: &mut RwTransaction, db: &mut Database) {
     let stdin = io::stdin();
     let handle = stdin.lock();

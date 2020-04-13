@@ -144,3 +144,20 @@ pub fn add_opt(files: impl Stream<Item=String>, include_dotfiles: bool, force: b
             }
         })))
 }
+
+pub fn calckey(file: String) -> Option<String> {
+    let cmd = Command::new("git-annex")
+        .args(&["calckey", file.as_str()])
+        .output()
+        .unwrap();
+
+    if cmd.status.success() {
+        //TODO: Do error checking; Git Annex should never return invalid UTF-8 but still...
+        unsafe {
+            Some(String::from_utf8_unchecked(cmd.stdout))
+        }
+
+    } else {
+        None
+    }
+}
