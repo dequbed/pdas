@@ -72,26 +72,26 @@ impl<'env, T: Transaction> Querier<'env, T> {
         Self { txn, db }
     }
     pub fn run(&mut self, query: Query) -> Result<HashSet<UUID>> {
-        self.runT(query.root)
+        self.run_t(query.root)
     }
-    pub fn runT(&mut self, query: QueryT) -> Result<HashSet<UUID>> {
+    fn run_t(&mut self, query: QueryT) -> Result<HashSet<UUID>> {
         // TODO: Keep the error path instead of bubbling it up throwing away that info
         match query {
             QueryT::F(filter, target) => {
                 self.filter(filter, target)
             }
             QueryT::OR(a, b) => {
-                let a_set = self.runT(*a)?;
-                let b_set = self.runT(*b)?;
+                let a_set = self.run_t(*a)?;
+                let b_set = self.run_t(*b)?;
                 Ok(HashSet::union(&a_set, &b_set).map(|u| *u).collect())
             }
             QueryT::AND(a, b) => {
-                let a_set = self.runT(*a)?;
-                let b_set = self.runT(*b)?;
+                let a_set = self.run_t(*a)?;
+                let b_set = self.run_t(*b)?;
                 Ok(HashSet::intersection(&a_set, &b_set).map(|u| *u).collect())
             }
             QueryT::NOT(a) => {
-                let a_set = self.runT(*a)?;
+                let a_set = self.run_t(*a)?;
                 let all_set = self.all()?;
                 Ok(HashSet::difference(&all_set, &a_set).map(|u| *u).collect())
             }

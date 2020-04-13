@@ -1,21 +1,13 @@
-use std::collections::HashMap;
-
 use std::path::PathBuf;
 
 use clap;
 use slog::Logger;
 
-use serde::Deserialize;
-
 use rarian::db::Database;
-use rarian::db::entry::{EntryT, FileT};
-use rarian::db::meta::{Metakey, Metavalue};
 use rarian::db::dbm::{self, DBManager};
 use rarian::Transaction;
 
 use crate::Settings;
-
-use futures::prelude::*;
 
 pub async fn import(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
     let target = m.value_of("target").expect("No value for `TARGET` set!");
@@ -43,5 +35,7 @@ pub async fn import(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
         error!(log, "Failed to import entries: {:?}", e);
     }
 
-    Transaction::commit(txn);
+    if let Err(e) = Transaction::commit(txn) {
+        error!(log, "Failed to commit transaction: {}", e);
+    }
 }

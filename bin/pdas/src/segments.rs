@@ -1,7 +1,5 @@
 use std::io::{self, BufRead};
 
-use futures::prelude::*;
-
 /// A stream of segments in a byte stream.
 ///
 /// This stream is created by the `segments` function on types that implement [`BufRead`].
@@ -36,6 +34,7 @@ impl<R: BufRead> Iterator for Segments<R> {
     }
 }
 
+#[allow(dead_code)]
 pub fn segments<R: BufRead>(reader: R, sep: u8) -> Segments<R> {
     Segments { reader, sep }
 }

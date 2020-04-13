@@ -1,16 +1,11 @@
-use std::collections::HashMap;
-
 use clap;
 use slog::Logger;
 
 use rarian::db::Database;
-use rarian::db::entry::{EntryT, FileT};
-use rarian::db::meta::{Metakey, Metavalue};
 use rarian::db::dbm::{self, DBManager};
 
 use crate::Settings;
 
-use futures::prelude::*;
 pub async fn dump(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
     let target = m.value_of("target").expect("No value for `TARGET` set!");
 
@@ -30,5 +25,7 @@ pub async fn dump(log: &Logger, s: Settings, m: &clap::ArgMatches<'_>) {
         }
     };
 
-    db.dump(&txn).map_err(|e| error!(log, "DB Dump: {:?}", e));
+    if let Err(e) = db.dump(&txn) {
+        error!(log, "DB Dump error: {:?}", e);
+    }
 }

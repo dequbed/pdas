@@ -4,8 +4,6 @@
 extern crate clap;
 #[macro_use]
 extern crate slog;
-#[macro_use]
-extern crate futures;
 
 use slog::Level;
 use slog::Drain;

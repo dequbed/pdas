@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::io::{self, BufRead};
-use std::path::PathBuf;
 
 use clap;
 use slog::Logger;
@@ -15,7 +14,6 @@ use rarian::RwTransaction;
 use rarian::Transaction;
 
 use crate::Settings;
-use crate::segments::segments;
 
 use futures::prelude::*;
 
