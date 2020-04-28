@@ -1,5 +1,7 @@
 # PDAS
 
+![logo](/logo-websave.svg)
+
 PDAS is a tool to manage large amounts of media files like (e)Books, Music,
 pod casts, Videos, Images, ...
 
@@ -31,3 +33,6 @@ functions in `rarian-lib`
 Additional support libraries that are useful outside of the limited scope
 of PDAS but are still developed as part of PDAS (e.g. the `deterom`
 library) are also placed in the lib folder.
+
+
+Icons based on works by [smalllikeart](https://www.flaticon.com/authors/smalllikeart) and [Vic Fieger](https://www.vicfieger.com/)
